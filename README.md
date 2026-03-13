@@ -84,7 +84,30 @@ alias Name = text
 alias Point = (float, float)
 ```
 
-### Casting
+### Equality Operators
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `==` | Same value | `x == 5` |
+| `!=` | Different value | `x != 5` |
+| `is` | Same object (reference) | `a is b` |
+| `is not` | Different object | `a is not b` |
+
+```zep
+a = "hello"
+b = "hello"
+c = a
+
+say a == b       @ true  — same value
+say a is b       @ false — different objects
+say a is c       @ true  — same object
+
+x = 10
+say x == 10      @ true
+say x != 5       @ true
+```
+
+
 ```zep
 n: int = "42" -> int
 s: text = 42 -> text
@@ -154,13 +177,22 @@ if not alive
   say "respawning"
 end
 
-@ Equality
-if name is "Alice"
+@ Value equality
+if name == "Alice"
   say "hi Alice"
 end
 
-if name is not "Bob"
+if name != "Bob"
   say "you are not Bob"
+end
+
+@ Reference / same object
+if a is b
+  say "same object"
+end
+
+if a is not b
+  say "different objects"
 end
 
 @ Pattern matching
@@ -574,8 +606,10 @@ end
 | Print | `say value` |
 | Return | `give value` |
 | Comment | `@ ...` |
-| Equal check | `is` |
-| Not equal | `is not` |
+| Value equal | `==` |
+| Value not equal | `!=` |
+| Same object | `is` |
+| Not same object | `is not` |
 | Logic | `and` `or` `not` |
 | Null | `none` |
 | Nullable type | `type?` |
