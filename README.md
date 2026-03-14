@@ -1,6 +1,6 @@
 # ⚡ Zep
 
-> A fast, simple, and readable programming language. Easier than Python — bytecode compilation with a stack-based VM. Available as a Haxelib.
+> A fast, simple, and readable programming language. Easier than Python — bytecode compilation with a stack-based VM.
 
 ---
 
