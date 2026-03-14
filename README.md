@@ -1,20 +1,22 @@
 # ⚡ Zep
 
-> A fast, simple, and readable programming language. Easier than Python — with bytecode and JIT compilation.
+> A fast, simple, and readable programming language. Easier than Python — bytecode compilation with a stack-based VM. Available as a Haxelib.
 
 ---
 
 ## Features
 
-- ✅ Clean, readable syntax — no semicolons, no colons
-- ✅ Optional type annotations
-- ✅ Bytecode compiled + JIT
-- ✅ Null safety
-- ✅ Pattern matching
-- ✅ Classes & interfaces
-- ✅ Modules & imports
-- ✅ Lambdas & pipelines
-- ✅ Built-in error handling
+- Clean, readable syntax — no semicolons, no colons
+- Optional type annotations
+- Bytecode compilation
+- Stack-based VM
+- Embeddable as a Haxelib
+- Null safety
+- Pattern matching
+- Classes & interfaces
+- Modules & imports
+- Lambdas & pipelines
+- Built-in error handling
 
 ---
 
@@ -66,18 +68,19 @@ const VERSION = "1.0.0"
 
 ## Types
 
-| Type | Example | Description |
-|---|---|---|
-| `int` | `42` | Whole number |
-| `float` | `3.14` | Decimal number |
-| `text` | `"hello"` | String |
-| `bool` | `true` | True or false |
-| `list<T>` | `[1, 2, 3]` | Typed array |
-| `map` | `{ name: "Alice" }` | Key-value pairs |
-| `any` | anything | No type check |
-| `none` | — | No return value |
+| Type      | Example             | Description     |
+| --------- | ------------------- | --------------- |
+| `int`     | `42`                | Whole number    |
+| `float`   | `3.14`              | Decimal number  |
+| `text`    | `"hello"`           | String          |
+| `bool`    | `true`              | True or false   |
+| `list<T>` | `[1, 2, 3]`         | Typed array     |
+| `map`     | `{ name: "Alice" }` | Key-value pairs |
+| `any`     | anything            | No type check   |
+| `none`    | —                   | No return value |
 
 ### Type Alias
+
 ```zep
 alias ID = int
 alias Name = text
@@ -86,12 +89,12 @@ alias Point = (float, float)
 
 ### Equality Operators
 
-| Operator | Meaning | Example |
-|---|---|---|
-| `==` | Same value | `x == 5` |
-| `!=` | Different value | `x != 5` |
-| `is` | Same object (reference) | `a is b` |
-| `is not` | Different object | `a is not b` |
+| Operator | Meaning                 | Example      |
+| -------- | ----------------------- | ------------ |
+| `==`     | Same value              | `x == 5`     |
+| `!=`     | Different value         | `x != 5`     |
+| `is`     | Same object (reference) | `a is b`     |
+| `is not` | Different object        | `a is not b` |
 
 ```zep
 a = "hello"
@@ -106,7 +109,6 @@ x = 10
 say x == 10      @ true
 say x != 5       @ true
 ```
-
 
 ```zep
 n: int = "42" -> int
@@ -353,19 +355,19 @@ say box.get()
 
 ### OOP Keywords
 
-| Keyword | Meaning |
-|---|---|
-| `class` | Define a class |
-| `init` | Constructor |
-| `self` | Current instance |
-| `super` | Parent constructor |
-| `from` | Inherit a class |
-| `is` | Implement interface |
-| `interface` | Define interface |
-| `abstract` | Abstract class or method |
-| `static` | Class-level member |
-| `pub` | Public |
-| `priv` | Private |
+| Keyword     | Meaning                  |
+| ----------- | ------------------------ |
+| `class`     | Define a class           |
+| `init`      | Constructor              |
+| `self`      | Current instance         |
+| `super`     | Parent constructor       |
+| `from`      | Inherit a class          |
+| `is`        | Implement interface      |
+| `interface` | Define interface         |
+| `abstract`  | Abstract class or method |
+| `static`    | Class-level member       |
+| `pub`       | Public                   |
+| `priv`      | Private                  |
 
 ---
 
@@ -451,16 +453,16 @@ end
 
 ### Standard Library
 
-| Module | Contents |
-|---|---|
-| `math` | `sqrt, pow, abs, floor, ceil` |
-| `text` | `split, join, trim, upper, lower` |
-| `list` | `sort, filter, map, reduce` |
-| `io` | `readFile, writeFile` |
-| `net.http` | `get, post, put, delete` |
-| `time` | `now, sleep, format` |
-| `json` | `parse, stringify` |
-| `os` | `env, args, exit` |
+| Module     | Contents                          |
+| ---------- | --------------------------------- |
+| `math`     | `sqrt, pow, abs, floor, ceil`     |
+| `text`     | `split, join, trim, upper, lower` |
+| `list`     | `sort, filter, map, reduce`       |
+| `io`       | `readFile, writeFile`             |
+| `net.http` | `get, post, put, delete`          |
+| `time`     | `now, sleep, format`              |
+| `json`     | `parse, stringify`                |
+| `os`       | `env, args, exit`                 |
 
 ---
 
@@ -601,47 +603,72 @@ end
 
 ## Quick Reference
 
-| Feature | Syntax |
-|---|---|
-| Print | `say value` |
-| Return | `give value` |
-| Comment | `@ ...` |
-| Value equal | `==` |
-| Value not equal | `!=` |
-| Same object | `is` |
-| Not same object | `is not` |
-| Logic | `and` `or` `not` |
-| Null | `none` |
-| Nullable type | `type?` |
-| Cast | `value -> type` |
-| Ternary | `if x then a else b` |
-| Pipeline | `x \|> fn()` |
-| Spread | `[...list]` |
-| Optional chain | `x?.y?.z` |
-| Null default | `x ?? default` |
-| Range | `0..10` |
-| Lambda | `fun(x) -> x * 2` |
-| Match | `match x` |
-| Constant | `const X = value` |
-| Type alias | `alias X = type` |
+| Feature         | Syntax               |
+| --------------- | -------------------- |
+| Print           | `say value`          |
+| Return          | `give value`         |
+| Comment         | `@ ...`              |
+| Value equal     | `==`                 |
+| Value not equal | `!=`                 |
+| Same object     | `is`                 |
+| Not same object | `is not`             |
+| Logic           | `and` `or` `not`     |
+| Null            | `none`               |
+| Nullable type   | `type?`              |
+| Cast            | `value -> type`      |
+| Ternary         | `if x then a else b` |
+| Pipeline        | `x \|> fn()`         |
+| Spread          | `[...list]`          |
+| Optional chain  | `x?.y?.z`            |
+| Null default    | `x ?? default`       |
+| Range           | `0..10`              |
+| Lambda          | `fun(x) -> x * 2`    |
+| Match           | `match x`            |
+| Constant        | `const X = value`    |
+| Type alias      | `alias X = type`     |
 
 ---
 
-## Roadmap
+## Execution Model
 
-- [x] Language design & syntax
-- [x] Type system
-- [x] OOP (classes, interfaces, generics)
-- [x] Error handling
-- [x] Modules
-- [ ] Lexer (Haxe)
-- [ ] Parser (Haxe)
-- [ ] Bytecode compiler
-- [ ] Stack VM
-- [ ] JIT (HashLink target)
-- [ ] Standard library
-- [ ] Package manager
+```
+zep main.zep
+    ↓
+Bytecode Compiler      ← compiles to bytecode internally
+    ↓
+Stack-based VM         ← executes bytecode on a value stack
+```
 
----
+| Stage                 | Description                                               |
+| --------------------- | --------------------------------------------------------- |
+| **Source → Bytecode** | Zep compiles `.zep` to bytecode automatically             |
+| **Stack-based VM**    | Pushes and pops values on a stack to execute instructions |
+
+### How the Stack VM works
+
+```
+@ Zep code
+x = 2 + 3
+
+@ Bytecode
+PUSH  2       @ stack: [2]
+PUSH  3       @ stack: [2, 3]
+ADD           @ stack: [5]
+STORE x       @ stack: []
+
+@ Function call
+say(add(1, 2))
+
+@ Bytecode
+PUSH   1      @ stack: [1]
+PUSH   2      @ stack: [1, 2]
+CALL   add    @ stack: [3]
+CALL   say    @ stack: []
+```
+
+```zep
+@ Just run it — everything happens automatically
+zep main.zep
+```
 
 > Zep — Simple syntax. Fast execution. Fun to write. ⚡
