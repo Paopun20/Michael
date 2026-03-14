@@ -17,6 +17,9 @@
 - Modules & imports
 - Lambdas & pipelines
 - Built-in error handling
+- Lazy evaluation
+- Enums & records
+- Built-in testing
 
 ---
 
@@ -36,9 +39,13 @@ say "Hello, World!"
 - [Control Flow](#control-flow)
 - [Loops](#loops)
 - [Classes & OOP](#classes--oop)
+- [Enums](#enums)
+- [Records](#records)
 - [Error Handling](#error-handling)
 - [Modules](#modules)
+- [Lazy Evaluation](#lazy-evaluation)
 - [Quality of Life](#quality-of-life)
+- [Testing](#testing)
 
 ---
 
@@ -84,7 +91,6 @@ const VERSION = "1.0.0"
 ```zep
 alias ID = int
 alias Name = text
-alias Point = (float, float)
 ```
 
 ### Equality Operators
@@ -166,6 +172,11 @@ end
 @ Inline if (ternary)
 status = if alive then "alive" else "dead"
 
+@ Unless (sugar for if not)
+unless x > 10
+  say "x is small"
+end
+
 @ Logic operators
 if x > 0 and x < 100
   say "in range"
@@ -177,6 +188,11 @@ end
 
 if not alive
   say "respawning"
+end
+
+@ Chained comparisons
+if 0 < x < 100
+  say "in range"
 end
 
 @ Value equality
@@ -203,6 +219,13 @@ match x
   2       -> say "two"
   3..10   -> say "three to ten"
   _       -> say "other"
+end
+
+@ Match with when guards
+match x
+  n when n < 0    -> say "negative"
+  n when n > 100  -> say "large"
+  _               -> say "normal"
 end
 
 @ Match on type
@@ -351,6 +374,17 @@ end
 
 box = Box<int>(42)
 say box.get()
+
+@ Lazy properties
+class Report
+  priv data: list<int>
+
+  init(data: list<int>)
+    self.data = data
+  end
+
+  lazy pub summary: text = buildSummary(self.data)  @ deferred until first access
+end
 ```
 
 ### OOP Keywords
@@ -366,8 +400,67 @@ say box.get()
 | `interface` | Define interface         |
 | `abstract`  | Abstract class or method |
 | `static`    | Class-level member       |
+| `lazy`      | Deferred property        |
 | `pub`       | Public                   |
 | `priv`      | Private                  |
+
+---
+
+## Enums
+
+```zep
+enum Direction
+  North, South, East, West
+end
+
+enum Status
+  Active
+  Inactive
+  Pending
+end
+
+dir = Direction.North
+
+match dir
+  Direction.North -> say "going north"
+  Direction.South -> say "going south"
+  _               -> say "other direction"
+end
+
+@ Enums with values
+enum Color
+  Red   = "#ff0000"
+  Green = "#00ff00"
+  Blue  = "#0000ff"
+end
+
+say Color.Red   @ "#ff0000"
+```
+
+---
+
+## Records
+
+A lightweight named data structure — safer than tuples, simpler than classes:
+
+```zep
+record Point
+  x: float
+  y: float
+end
+
+record Person
+  name: text
+  age: int
+end
+
+p = Point(x: 1.0, y: 2.0)
+say p.x   @ 1.0
+
+@ Records are immutable by default
+@ Destructuring works naturally
+{ name, age } = Person(name: "Alice", age: 30)
+```
 
 ---
 
@@ -385,7 +478,7 @@ end
 
 @ Throw errors
 fun divide(a: int, b: int) -> float
-  if b is 0
+  if b == 0
     throw "Cannot divide by zero"
   end
   give a / b
@@ -410,7 +503,7 @@ end
 
 @ Result type (Rust style)
 fun divide(a: int, b: int) -> int | error
-  if b is 0
+  if b == 0
     give error("divide by zero")
   end
   give a / b
@@ -453,16 +546,113 @@ end
 
 ### Standard Library
 
-| Module     | Contents                          |
-| ---------- | --------------------------------- |
-| `math`     | `sqrt, pow, abs, floor, ceil`     |
-| `text`     | `split, join, trim, upper, lower` |
-| `list`     | `sort, filter, map, reduce`       |
-| `io`       | `readFile, writeFile`             |
-| `net.http` | `get, post, put, delete`          |
-| `time`     | `now, sleep, format`              |
-| `json`     | `parse, stringify`                |
-| `os`       | `env, args, exit`                 |
+| Module     | Contents                               |
+| ---------- | -------------------------------------- |
+| `math`     | `sqrt, pow, abs, floor, ceil`          |
+| `text`     | `split, join, trim, upper, lower`      |
+| `list`     | `sort, filter, map, reduce`            |
+| `io`       | `readFile, writeFile`                  |
+| `net.http` | `get, post, put, delete`               |
+| `time`     | `now, sleep, format`                   |
+| `date`     | `today, parse, diff, format`           |
+| `json`     | `parse, stringify`                     |
+| `os`       | `env, args, exit`                      |
+| `random`   | `int, float, pick, shuffle`            |
+| `regex`    | `match, find, replace, test`           |
+| `assert`   | `equal, notEqual, throws, true, false` |
+
+---
+
+## Lazy Evaluation
+
+The `lazy` keyword defers computation until the value is first accessed, then caches the result.
+
+### Lazy Variables
+
+```zep
+lazy expensive = loadFromDisk("data.json")
+
+@ Nothing loads here ↑
+@ Computed and cached on first read ↓
+
+say expensive   @ loads now
+say expensive   @ uses cache
+```
+
+### Lazy Module Imports
+
+```zep
+lazy use math
+lazy use net.http as http
+
+@ Neither module loads at startup
+
+fun circleArea(r: float) -> float
+  give math.sqrt(r) * r   @ math loads here, on first use
+end
+
+@ If circleArea is never called, math is never loaded
+```
+
+Lazy imports are especially useful for conditional code paths:
+
+```zep
+lazy use net.http as http
+
+if connected
+  result = http.get("https://api.example.com")  @ loads here
+else
+  say "offline mode"   @ http never loads
+end
+```
+
+Note: when using `lazy use`, import the whole module rather than destructuring. `lazy use math { sqrt }` would make `sqrt` a lazy name — it triggers on first **reference**, not first call, which can behave unexpectedly when passing functions around.
+
+### Lazy Function Arguments
+
+Arguments are not evaluated until actually used inside the function:
+
+```zep
+fun log(msg: lazy text) -> none
+  if debugMode
+    say msg   @ only evaluated if debugMode is true
+  end
+end
+
+log(buildHugeString())   @ never runs if debug is off
+```
+
+### Lazy Sequences / Generators
+
+Produce values one at a time instead of building a full list in memory:
+
+```zep
+lazy fun range(start: int, end: int) -> int
+  every i in start..end
+    yield i
+  end
+end
+
+every n in range(0, 1000000)
+  if n > 5
+    stop
+  end
+  say n   @ only computes what's needed
+end
+```
+
+### Lazy Properties on Classes
+
+```zep
+class Report
+  lazy pub summary: text = buildSummary()   @ deferred until accessed
+end
+
+r = Report()
+@ buildSummary() has not run yet
+say r.summary   @ runs now, result cached
+say r.summary   @ uses cache
+```
 
 ---
 
@@ -539,6 +729,34 @@ nums.reduce(fun(a, b) -> a + b)
 
 ---
 
+## Testing
+
+Built-in test syntax — no framework needed:
+
+```zep
+test "adds two numbers"
+  expect add(1, 2) == 3
+end
+
+test "greet returns correct string"
+  expect greet("Alice") == "Hello Alice!"
+end
+
+test "divide throws on zero"
+  expect throws
+    divide(10, 0)
+  end
+end
+```
+
+Run tests with:
+
+```text
+zep test main.zep
+```
+
+---
+
 ## Full Example
 
 ```zep
@@ -603,35 +821,45 @@ end
 
 ## Quick Reference
 
-| Feature         | Syntax               |
-| --------------- | -------------------- |
-| Print           | `say value`          |
-| Return          | `give value`         |
-| Comment         | `@ ...`              |
-| Value equal     | `==`                 |
-| Value not equal | `!=`                 |
-| Same object     | `is`                 |
-| Not same object | `is not`             |
-| Logic           | `and` `or` `not`     |
-| Null            | `none`               |
-| Nullable type   | `type?`              |
-| Cast            | `value -> type`      |
-| Ternary         | `if x then a else b` |
-| Pipeline        | `x \|> fn()`         |
-| Spread          | `[...list]`          |
-| Optional chain  | `x?.y?.z`            |
-| Null default    | `x ?? default`       |
-| Range           | `0..10`              |
-| Lambda          | `fun(x) -> x * 2`    |
-| Match           | `match x`            |
-| Constant        | `const X = value`    |
-| Type alias      | `alias X = type`     |
+| Feature         | Syntax                    |
+| --------------- | ------------------------- |
+| Print           | `say value`               |
+| Return          | `give value`              |
+| Comment         | `@ ...`                   |
+| Value equal     | `==`                      |
+| Value not equal | `!=`                      |
+| Same object     | `is`                      |
+| Not same object | `is not`                  |
+| Logic           | `and` `or` `not`          |
+| Null            | `none`                    |
+| Nullable type   | `type?`                   |
+| Cast            | `value -> type`           |
+| Ternary         | `if x then a else b`      |
+| Unless          | `unless x`                |
+| Pipeline        | `x \|> fn()`              |
+| Spread          | `[...list]`               |
+| Optional chain  | `x?.y?.z`                 |
+| Null default    | `x ?? default`            |
+| Range           | `0..10`                   |
+| Lambda          | `fun(x) -> x * 2`         |
+| Match           | `match x`                 |
+| Match guard     | `n when n < 0`            |
+| Chained compare | `0 < x < 100`             |
+| Constant        | `const X = value`         |
+| Type alias      | `alias X = type`          |
+| Enum            | `enum X`                  |
+| Record          | `record X`                |
+| Lazy value      | `lazy x = ...`            |
+| Lazy import     | `lazy use module`         |
+| Lazy argument   | `fun(x: lazy T)`          |
+| Generator       | `fun` + `yield`           |
+| Test            | `test "name_test" expect` |
 
 ---
 
 ## Execution Model
 
-```
+```text
 zep main.zep
     ↓
 Bytecode Compiler      ← compiles to bytecode internally
@@ -646,7 +874,7 @@ Stack-based VM         ← executes bytecode on a value stack
 
 ### How the Stack VM works
 
-```
+```text
 @ Zep code
 x = 2 + 3
 
@@ -666,9 +894,10 @@ CALL   add    @ stack: [3]
 CALL   say    @ stack: []
 ```
 
-```zep
-@ Just run it — everything happens automatically
-zep main.zep
+```text
+zep main.zep        @ run a file
+zep test main.zep   @ run tests
+zep repl            @ interactive shell
 ```
 
 > Zep — Simple syntax. Fast execution. Fun to write. ⚡

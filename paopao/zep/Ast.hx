@@ -1,6 +1,6 @@
 package paopao.zep;
 
-class Expr {
+abstract class Expr {
 	public var expr:ExprDef;
 	public var line:Int;
 
