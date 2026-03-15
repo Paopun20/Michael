@@ -1,8 +1,8 @@
-package paopao.zep;
+package paopao.zap;
 
-import paopao.zep.Ast.ExprUnop;
-import paopao.zep.Ast.ExprBinop;
-import paopao.zep.Error.ErrorDef;
+import paopao.zap.Ast.ExprUnop;
+import paopao.zap.Ast.ExprBinop;
+import paopao.zap.Error.ErrorDef;
 
 typedef LTokenPos = {
 	var token:LToken;

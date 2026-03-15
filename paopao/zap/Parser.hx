@@ -1,14 +1,16 @@
-package paopao.zep;
+package paopao.zap;
 
-import paopao.zep.Ast;
-import paopao.zep.Lexer;
-import paopao.zep.Error;
+import paopao.zap.Ast;
+import paopao.zap.Lexer;
+import paopao.zap.Error;
+using StringTools;
 
 class Parser {
 	// State
 	var tokens:Array<LTokenPos>;
 	var pos:Int;
 	var fileName:String;
+	var inMatchGuard:Bool = false;
 
 	/**
 	 * Variable-name intern table.
@@ -329,7 +331,7 @@ class Parser {
 	function parseCast():Expr {
 		var line = curLine();
 		var e = parsePostfix();
-		while (matchOp(OpArrow))
+		while (!inMatchGuard && matchOp(OpArrow))
 			e = mk(ECast(e, parseTypeName()), line);
 		return e;
 	}
@@ -347,10 +349,10 @@ class Parser {
 					e = mk(ECall(e, args), line);
 				case TDot:
 					advance();
-					e = mk(EField(e, expectIdent()), line);
+					e = mk(EField(e, expectFieldName()), line);
 				case TOp(OpOptChain):
 					advance();
-					e = mk(EOptField(e, expectIdent()), line);
+					e = mk(EOptField(e, expectFieldName()), line);
 				case TBkOpen:
 					advance();
 					var idx = parseExpr();
@@ -406,6 +408,12 @@ class Parser {
 			case TOp(OpSpread):
 				advance();
 				mk(ESpread(parseUnary()), line);
+			// Any keyword that wasn't handled as a syntax form above is treated
+			// as a variable name — covers params/variables named after keywords
+			// (stop, repeat, in, type, match, …).
+			case TKeyword(k):
+				advance();
+				mk(EIdent((k : String)), line);
 			default: parseError('Unexpected token: ${tokenStr(peek().token)}');
 		}
 	}
@@ -701,7 +709,12 @@ class Parser {
 				def = parseMatchArm();
 			} else {
 				var pat = parseMatchPattern();
-				var guard = matchKw(KWhen) ? parseExpr() : null;
+				var guard:Null<Expr> = null;
+				if (matchKw(KWhen)) {
+					inMatchGuard = true;
+					guard = parseExpr();
+					inMatchGuard = false;
+				}
 				expect(TOp(OpArrow));
 				cases.push(new SwitchCase([pat], parseMatchArm(), guard));
 			}
@@ -718,9 +731,11 @@ class Parser {
 	 */
 	function parseMatchPattern():Expr {
 		var line = curLine();
-		var e = parsePrimary();
+		// Use parsePostfix so  Enum.Variant  patterns resolve the dot access.
+		// We stop before cast (->) since that token belongs to the arm arrow.
+		var e = parsePostfix();
 		if (matchOp(OpRange))
-			return mk(ERange(e, parsePrimary()), line);
+			return mk(ERange(e, parsePostfix()), line);
 		return e;
 	}
 
@@ -745,27 +760,40 @@ class Parser {
 	function parseFun(isLazy:Bool):Expr {
 		var line = curLine();
 		expect(TKeyword(KFun));
-		// Name is absent for anonymous / lambda functions
 		var name:Null<String> = checkIdent() ? expectIdent() : null;
 		expect(TPOpen);
 		var args = parseFunArgs();
 		expect(TPClose);
-		var ret:Null<String> = matchOp(OpArrow) ? parseFunRetType() : null;
-		// Lambda form — no newline, no end
-		if (!isStmtEnd()) {
-			return mk(EFunction(name, args, ret, parseExpr(), isLazy), line);
+
+		// Named function:  fun name(args) -> RetType \n body end
+		//   -> introduces a return type annotation, followed by a newline + block.
+		// Anonymous lambda:  fun(args) -> expr
+		//   -> introduces the body expression directly — no return type token.
+		if (name != null) {
+			var ret:Null<String> = matchOp(OpArrow) ? parseFunRetType() : null;
+			expectNewline();
+			var body = parseBlock();
+			expect(TKeyword(KEnd));
+			return mk(EFunction(name, args, ret, body, isLazy), line);
+		} else {
+			if (matchOp(OpArrow)) {
+				// Lambda:  fun(args) -> expr
+				return mk(EFunction(null, args, null, parseExpr(), isLazy), line);
+			}
+			// Block lambda:  fun(args) \n body end
+			expectNewline();
+			var body = parseBlock();
+			expect(TKeyword(KEnd));
+			return mk(EFunction(null, args, null, body, isLazy), line);
 		}
-		expectNewline();
-		var body = parseBlock();
-		expect(TKeyword(KEnd));
-		return mk(EFunction(name, args, ret, body, isLazy), line);
 	}
 
 	function parseFunArgs():Array<Argument> {
 		var args:Array<Argument> = [];
 		while (!check(TPClose)) {
 			matchOp(OpSpread); // spread ...name  — consumed, not yet stored in Argument
-			var argName = expectIdent();
+			// Parameter names may shadow keywords (e.g. stop, repeat, in, type).
+			var argName = expectFieldName();
 			var typeStr:Null<String> = null;
 			if (matchToken(TColon)) {
 				// lazy argument:  name: lazy type
@@ -1333,6 +1361,15 @@ class Parser {
 				s;
 			default:
 				parseError('Expected identifier, got ${tokenStr(peek().token)}');
+		}
+
+	/** Like expectIdent but also accepts keyword tokens as field names.
+	 *  Needed for  obj.repeat()  obj.type  etc. where the name is a keyword. */
+	function expectFieldName():String
+		return switch peek().token {
+			case TIdent(s):   advance(); s;
+			case TKeyword(k): advance(); (k : String);
+			default: parseError('Expected field name, got ${tokenStr(peek().token)}');
 		}
 
 	function expectString():String

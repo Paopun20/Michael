@@ -1,4 +1,4 @@
-package paopao.zep; // Core wrapper
+package paopao.zap; // Core wrapper
 
 abstract class Expr {
 	public var expr:ExprDef;

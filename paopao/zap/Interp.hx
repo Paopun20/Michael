@@ -1,8 +1,8 @@
-package paopao.zep;
+package paopao.zap;
 
 import haxe.ds.StringMap;
-import paopao.zep.Ast;
-import paopao.zep.Error;
+import paopao.zap.Ast;
+import paopao.zap.Error;
 
 private class Signal {}
 
@@ -155,8 +155,15 @@ class ZepInstance implements IZepCustomBehaviour {
 			return fields.get(name);
 		var k = klass;
 		while (k != null) {
-			if (k.methods.exists(name))
-				return k.methods.get(name);
+			if (k.methods.exists(name)) {
+				var fn:ZepFunction = k.methods.get(name);
+				// Bind self so method bodies can reference it.
+				var bound = new ZepFunction(fn.name, fn.args, fn.body,
+				                            fn.closure.child(), fn.varNames, fn.isGenerator);
+				bound.closure.define("self", this);
+				bound.native = fn.native;
+				return bound;
+			}
 			k = k.parent;
 		}
 		throw new Error(ERunError('No field "$name" on ${klass.name}'));

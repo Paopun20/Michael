@@ -1,8 +1,8 @@
-package paopao.zep;
+package paopao.zap;
 
-import paopao.zep.Lexer.LToken;
-import paopao.zep.Ast.ExprUnop;
-import paopao.zep.Ast.ExprBinop;
+import paopao.zap.Lexer.LToken;
+import paopao.zap.Ast.ExprUnop;
+import paopao.zap.Ast.ExprBinop;
 import haxe.ds.Either;
 
 enum ErrorDef {
