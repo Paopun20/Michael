@@ -1,4 +1,4 @@
-# ⚡ Zep
+# ⚡ Zap
 
 > A fast, simple, and readable programming language. Easier than Python — bytecode compilation with a stack-based VM.
 
@@ -25,7 +25,7 @@
 
 ## Hello World
 
-```zep
+```Zap
 say "Hello, World!"
 ```
 
@@ -51,7 +51,7 @@ say "Hello, World!"
 
 ## Variables
 
-```zep
+```Zap
 @ Untyped
 x = 10
 name = "Alice"
@@ -88,7 +88,7 @@ const VERSION = "1.0.0"
 
 ### Type Alias
 
-```zep
+```Zap
 alias ID = int
 alias Name = text
 ```
@@ -102,7 +102,7 @@ alias Name = text
 | `is`     | Same object (reference) | `a is b`     |
 | `is not` | Different object        | `a is not b` |
 
-```zep
+```Zap
 a = "hello"
 b = "hello"
 c = a
@@ -116,7 +116,7 @@ say x == 10      @ true
 say x != 5       @ true
 ```
 
-```zep
+```Zap
 n: int = "42" -> int
 s: text = 42 -> text
 ```
@@ -125,7 +125,7 @@ s: text = 42 -> text
 
 ## Functions
 
-```zep
+```Zap
 @ Basic
 fun greet(name: text) -> none
   say "Hello {name}!"
@@ -159,7 +159,7 @@ square = fun(x: int) -> x * x
 
 ## Control Flow
 
-```zep
+```Zap
 @ If / else
 if age >= 18
   say "Adult"
@@ -240,7 +240,7 @@ end
 
 ## Loops
 
-```zep
+```Zap
 @ Repeat N times
 repeat 5 times
   say "Hello!"
@@ -279,7 +279,7 @@ end
 
 ## Classes & OOP
 
-```zep
+```Zap
 @ Basic class
 class Dog
   pub name: text
@@ -408,7 +408,7 @@ end
 
 ## Enums
 
-```zep
+```Zap
 enum Direction
   North, South, East, West
 end
@@ -443,7 +443,7 @@ say Color.Red   @ "#ff0000"
 
 A lightweight named data structure — safer than tuples, simpler than classes:
 
-```zep
+```Zap
 record Point
   x: float
   y: float
@@ -466,7 +466,7 @@ say p.x   @ 1.0
 
 ## Error Handling
 
-```zep
+```Zap
 @ Try / catch / always
 try
   x = divide(10, 0)
@@ -521,7 +521,7 @@ end
 
 ## Modules
 
-```zep
+```Zap
 @ Import whole module
 use math
 
@@ -569,7 +569,7 @@ The `lazy` keyword defers computation until the value is first accessed, then ca
 
 ### Lazy Variables
 
-```zep
+```Zap
 lazy expensive = loadFromDisk("data.json")
 
 @ Nothing loads here ↑
@@ -581,7 +581,7 @@ say expensive   @ uses cache
 
 ### Lazy Module Imports
 
-```zep
+```Zap
 lazy use math
 lazy use net.http as http
 
@@ -596,7 +596,7 @@ end
 
 Lazy imports are especially useful for conditional code paths:
 
-```zep
+```Zap
 lazy use net.http as http
 
 if connected
@@ -612,7 +612,7 @@ Note: when using `lazy use`, import the whole module rather than destructuring. 
 
 Arguments are not evaluated until actually used inside the function:
 
-```zep
+```Zap
 fun log(msg: lazy text) -> none
   if debugMode
     say msg   @ only evaluated if debugMode is true
@@ -626,7 +626,7 @@ log(buildHugeString())   @ never runs if debug is off
 
 Produce values one at a time instead of building a full list in memory:
 
-```zep
+```Zap
 lazy fun range(start: int, end: int) -> int
   every i in start..end
     yield i
@@ -643,7 +643,7 @@ end
 
 ### Lazy Properties on Classes
 
-```zep
+```Zap
 class Report
   lazy pub summary: text = buildSummary()   @ deferred until accessed
 end
@@ -658,7 +658,7 @@ say r.summary   @ uses cache
 
 ## Quality of Life
 
-```zep
+```Zap
 @ String interpolation
 say "Hello {name}, you are {age} years old!"
 say "Next year: {age + 1}"
@@ -666,7 +666,7 @@ say "Next year: {age + 1}"
 @ Multiline strings
 msg = """
 Hello World
-This is Zep
+This is Zap
 """
 
 @ Pipeline operator
@@ -703,7 +703,7 @@ x--
 
 ### Built-in Methods
 
-```zep
+```Zap
 @ Text
 "hello".upper()             @ "HELLO"
 "HELLO".lower()             @ "hello"
@@ -733,7 +733,7 @@ nums.reduce(fun(a, b) -> a + b)
 
 Built-in test syntax — no framework needed:
 
-```zep
+```Zap
 test "adds two numbers"
   expect add(1, 2) == 3
 end
@@ -752,14 +752,14 @@ end
 Run tests with:
 
 ```text
-zep test main.zep
+Zap test main.Zap
 ```
 
 ---
 
 ## Full Example
 
-```zep
+```Zap
 use math { sqrt }
 
 class Player
@@ -808,7 +808,7 @@ end
 
 ## Comments
 
-```zep
+```Zap
 @ This is a single line comment
 
 @--
@@ -857,4 +857,4 @@ end
 
 ---
 
-> Zep — Simple syntax. Fast execution. Fun to write. ⚡
+> Zap — Simple syntax. Fast execution. Fun to write. ⚡
