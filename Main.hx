@@ -14,7 +14,7 @@ class Main {
 		if (args.length == 0)
 			runRepl();
 
-		// Bare  zep <file.zep>  shorthand
+		// Bare  zap <file.zap>  shorthand
 		if (StringTools.endsWith(args[0], ".zap"))
 			runFile(args[0], false);
 		else {
@@ -28,7 +28,7 @@ class Main {
 	// File runner
 	static function runFile(path:String, testMode:Bool):Void {
 		if (!sys.FileSystem.exists(path)) {
-			Sys.stderr().writeString('zep: file not found: $path\n');
+			Sys.stderr().writeString('zap: file not found: $path\n');
 			Sys.exit(1);
 		}
 
@@ -45,7 +45,7 @@ class Main {
 			Sys.stderr().writeString(e.toString() + "\n");
 			Sys.exit(1);
 		} catch (e:Dynamic) {
-			Sys.stderr().writeString('zep: uncaught error: $e\n');
+			Sys.stderr().writeString('zap: uncaught error: $e\n');
 			Sys.exit(1);
 		}
 
@@ -58,7 +58,7 @@ class Main {
 
 	// REPL
 	static function runRepl():Void {
-		Sys.println("Zep - Dev Build");
+		Sys.println("zap - Dev Build");
 		Sys.println("Type \"help\" , \"copyright\", \"credits\" or \"license\" for more information.");
 
 		var interp = new Interp();
@@ -82,7 +82,7 @@ class Main {
 					case "copyright":
 						Sys.println("Copyright (c) 2023 Zap Developers");
 					case "credits":
-						Sys.println("Developed by the Zep Team");
+						Sys.println("Developed by Paopun20 and contributors");
 					case "license":
 						Sys.println("Licensed under the MIT License");
 						Sys.println("https://opensource.org/licenses/MIT");
