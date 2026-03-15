@@ -861,4 +861,4 @@ end
 
 ---
 
-> language name duplicate, bruh
+> I name language and duplicate it, bruh
