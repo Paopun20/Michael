@@ -858,3 +858,7 @@ end
 ---
 
 > Zap — Simple syntax. Fast execution. Fun to write. ⚡
+
+---
+
+> language name duplicate, bruh
