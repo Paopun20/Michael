@@ -15,7 +15,7 @@ class Main {
 			runRepl();
 
 		// Bare  zep <file.zep>  shorthand
-		if (StringTools.endsWith(args[0], ".zep"))
+		if (StringTools.endsWith(args[0], ".zap"))
 			runFile(args[0], false);
 		else {
 			Sys.stderr().writeString('Unknown command "${args[0]}"\n');
@@ -77,7 +77,7 @@ class Main {
 				switch (line.toLowerCase()) {
 					case "help":
 						Sys.println("It no help in Dev Build, sorry!");
-						Sys.println("Try the online playground or check the GitHub repo for docs and examples");
+						Sys.println("Check the GitHub repo for docs and examples");
 						Sys.println("https://github.com/Paopun20/Zap");
 					case "copyright":
 						Sys.println("Copyright (c) 2023 Zap Developers");
@@ -92,6 +92,7 @@ class Main {
 						var src = line;
 						while (needsContinuation(src)) {
 							Sys.print("... ");
+							Sys.stdout().flush();
 							var more = readLine();
 							if (more == null)
 								break;

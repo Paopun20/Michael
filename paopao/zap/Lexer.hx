@@ -273,32 +273,26 @@ class Lexer {
 	function readString(start:Int) {
 		pos++; // skip opening "
 		var buf = new StringBuf();
+		var closed = false;
 		while (pos < src.length) {
 			var cc = at(pos);
 			if (cc == 34 /*"*/) {
 				pos++;
+				closed = true;
 				break;
 			}
 			if (cc == 10)
 				lexError("Unterminated string literal");
 			if (cc == 92 /*\\*/) {
-				pos++;
+				pos++; // skip backslash
 				switch at(pos) {
-					case 110:
-						buf.addChar(10); // \n
-					case 116:
-						buf.addChar(9); // \t
-					case 114:
-						buf.addChar(13); // \r
-					case 34:
-						buf.addChar(34); // \"
-					case 92:
-						buf.addChar(92); // \\
-					case 123:
-						buf.addChar(123); // \{  — escaped brace
-					case c:
-						buf.addChar(92);
-						buf.addChar(c); // unknown — keep both
+					case 110:  buf.addChar(10);  // \n
+					case 116:  buf.addChar(9);   // \t
+					case 114:  buf.addChar(13);  // \r
+					case 34:   buf.addChar(34);  // \"
+					case 92:   buf.addChar(92);  // \\
+					case 123:  buf.addChar(123); // \{
+					case c:    buf.addChar(92); buf.addChar(c);
 				}
 				pos++;
 				continue;
@@ -306,6 +300,7 @@ class Lexer {
 			buf.addChar(cc);
 			pos++;
 		}
+		if (!closed) lexError("Unterminated string literal");
 		push(TConst(LCString(buf.toString())), start, pos);
 	}
 

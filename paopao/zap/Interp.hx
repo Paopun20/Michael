@@ -1259,8 +1259,8 @@ class Interp {
 		m.set("min", ZepFunction.ofNative("min", a -> Math.min(a[0], a[1])));
 		m.set("max", ZepFunction.ofNative("max", a -> Math.max(a[0], a[1])));
 		m.set("log", ZepFunction.ofNative("log", a -> Math.log(a[0])));
-		m.set("PI", Math.PI);
-		m.set("E", Math.exp(1.0));
+		m.set("pi", Math.PI);
+		m.set("e", Math.exp(1.0));
 		return m;
 	}
 

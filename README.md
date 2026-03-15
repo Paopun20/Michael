@@ -707,10 +707,10 @@ x--
 @ Text
 "hello".upper()             @ "HELLO"
 "HELLO".lower()             @ "hello"
-"hello world".split(" ")   @ ["hello", "world"]
+"hello world".split(" ")    @ ["hello", "world"]
 "  hi  ".trim()             @ "hi"
 "hi".repeat(3)              @ "hihihi"
-"hello".contains("ell")    @ true
+"hello".contains("ell")     @ true
 "hello".length              @ 5
 
 @ List
@@ -856,48 +856,5 @@ end
 | Test            | `test "name_test" expect` |
 
 ---
-
-## Execution Model
-
-```text
-zep main.zep
-    ↓
-Bytecode Compiler      ← compiles to bytecode internally
-    ↓
-Stack-based VM         ← executes bytecode on a value stack
-```
-
-| Stage                 | Description                                               |
-| --------------------- | --------------------------------------------------------- |
-| **Source → Bytecode** | Zep compiles `.zep` to bytecode automatically             |
-| **Stack-based VM**    | Pushes and pops values on a stack to execute instructions |
-
-### How the Stack VM works
-
-```text
-@ Zep code
-x = 2 + 3
-
-@ Bytecode
-PUSH  2       @ stack: [2]
-PUSH  3       @ stack: [2, 3]
-ADD           @ stack: [5]
-STORE x       @ stack: []
-
-@ Function call
-say(add(1, 2))
-
-@ Bytecode
-PUSH   1      @ stack: [1]
-PUSH   2      @ stack: [1, 2]
-CALL   add    @ stack: [3]
-CALL   say    @ stack: []
-```
-
-```text
-zep main.zep        @ run a file
-zep test main.zep   @ run tests
-zep repl            @ interactive shell
-```
 
 > Zep — Simple syntax. Fast execution. Fun to write. ⚡
