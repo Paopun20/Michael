@@ -18,8 +18,8 @@ class MichOS {
 	public static function args():Array<String>
 		return Sys.args();
 
-	public static function command(cmd:String):Int
-		return Sys.command(cmd);
+	public static function command(cmd:String, args:Null<Array<String>>):Int
+		return Sys.command(cmd, args == null ? [] : args);
 
 	public static function exit(code:Int):Bool {
 		Sys.exit(code);
