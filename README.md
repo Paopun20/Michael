@@ -1,6 +1,7 @@
 # ⚡ Zap
 
-> A fast, simple, and readable programming language. Easier than Python — bytecode compilation with a stack-based VM.
+> A fast, simple, and readable programming language. — bytecode compilation with a stack-based VM.
+> Inspired Python + Zig + Nim + Rust + Lua + Etc
 
 ---
 
@@ -20,6 +21,7 @@
 - Lazy evaluation
 - Enums & records
 - Built-in testing
+- Code In Haxe
 
 ---
 
@@ -854,7 +856,3 @@ end
 | Lazy argument   | `fun(x: lazy T)`          |
 | Generator       | `fun` + `yield`           |
 | Test            | `test "name_test" expect` |
-
----
-
-> Zap — Simple syntax. Fast execution. Fun to write. ⚡

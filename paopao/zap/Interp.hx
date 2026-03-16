@@ -234,6 +234,8 @@ class ZapLazy {
 typedef TestResult = {name:String, passed:Bool, error:Null<String>}
 
 // Interpreter
+
+@:analyzer(optimize, local_dce, fusion, user_var_fusion)
 class Interp {
 	// State
 	public var globals:Env;
@@ -276,8 +278,9 @@ class Interp {
 	// Entry points
 
 	/** Run a pre-parsed statement list with its variable-name table. */
-	public function run(stmts:Array<Expr>, varNames:VariableInfo):Dynamic {
-		this.varNames = varNames;
+	public function run(stmts:Array<Expr>, varNames:Null<VariableInfo> = null):Dynamic {
+		if (varNames != null)
+			this.varNames = varNames;
 		var last:Dynamic = null;
 		for (s in stmts)
 			last = eval(s);
@@ -907,7 +910,14 @@ class Interp {
 		env = callEnv;
 		var result:Dynamic = null;
 		try {
-			result = eval(f.body);
+			// Evaluate block statements directly instead of going through evalBlock,
+			// which would create yet another child env.
+			var stmts = switch f.body.expr {
+				case EBlock(exprs): exprs;
+				default: [f.body];
+			};
+			for (s in stmts)
+				result = eval(s);
 		} catch (sig:ReturnSig) {
 			result = sig.v;
 		}

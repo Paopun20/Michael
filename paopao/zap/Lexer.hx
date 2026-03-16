@@ -138,6 +138,7 @@ enum abstract LKeyword(String) from String to String {
 	var KThrows = "throws";
 }
 
+@:analyzer(optimize, local_dce, fusion, user_var_fusion)
 class Lexer {
 	var src:String;
 	var pos:Int;

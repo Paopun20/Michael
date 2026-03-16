@@ -70,6 +70,7 @@ class Main {
 			var failed = interp.testResults.filter(r -> !r.passed).length;
 			Sys.exit(failed > 0 ? 1 : 0);
 		}
+		Sys.exit(0);
 	}
 
 	// REPL
@@ -127,15 +128,12 @@ class Main {
 						}
 
 						try {
-							var parser = (new Parser());
-							// Seed the parser with accumulated names so prior bindings resolve
-							parser.parseString(src, "<repl>");
-							// Merge any new names into the shared table
+							var parser = new Parser();
+							var stmts = parser.parseString(src, "<repl>");
 							for (n in parser.varNames)
 								if (varNames.indexOf(n) == -1)
 									varNames.push(n);
 
-							var stmts = (new Parser()).parseString(src, "<repl>");
 							var result = interp.run(stmts, varNames);
 							if (result != null)
 								Sys.println("=> " + interp.valToString(result));
@@ -156,24 +154,34 @@ class Main {
 
 		for (line in src.split("\n")) {
 			var t = StringTools.trim(line);
-			if (t == "" || StringTools.startsWith(t, "@")) continue;
+			if (t == "" || StringTools.startsWith(t, "@"))
+				continue;
 
 			// Block openers (excluding `fun` — handled separately below)
 			var openers = ~/\b(if|unless|while|repeat|every|match|init|class|interface|record|enum|try|test)\b/g;
 			var s = t;
-			while (openers.match(s)) { depth++; s = openers.matchedRight(); }
+			while (openers.match(s)) {
+				depth++;
+				s = openers.matchedRight();
+			}
 
 			// `fun` opens a block unless the line is an abstract declaration
 			if (!abstractSig.match(t)) {
 				var funR = ~/\bfun\b/g;
 				s = t;
-				while (funR.match(s)) { depth++; s = funR.matchedRight(); }
+				while (funR.match(s)) {
+					depth++;
+					s = funR.matchedRight();
+				}
 			}
 
 			// `end` closes a block
 			var endR = ~/\bend\b/g;
 			s = t;
-			while (endR.match(s)) { depth--; s = endR.matchedRight(); }
+			while (endR.match(s)) {
+				depth--;
+				s = endR.matchedRight();
+			}
 		}
 
 		return depth > 0;

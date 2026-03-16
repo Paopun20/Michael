@@ -6,6 +6,7 @@ import paopao.zap.Error;
 
 using StringTools;
 
+@:analyzer(optimize, local_dce, fusion, user_var_fusion)
 class Parser {
 	// State
 	var tokens:Array<LTokenPos>;
