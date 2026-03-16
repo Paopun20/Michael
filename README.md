@@ -25,7 +25,7 @@
 
 ## Hello World
 
-```Zap
+```zap
 say "Hello, World!"
 ```
 
@@ -51,7 +51,7 @@ say "Hello, World!"
 
 ## Variables
 
-```Zap
+```zap
 @ Untyped
 x = 10
 name = "Alice"
@@ -88,7 +88,7 @@ const VERSION = "1.0.0"
 
 ### Type Alias
 
-```Zap
+```zap
 alias ID = int
 alias Name = text
 ```
@@ -102,7 +102,7 @@ alias Name = text
 | `is`     | Same object (reference) | `a is b`     |
 | `is not` | Different object        | `a is not b` |
 
-```Zap
+```zap
 a = "hello"
 b = "hello"
 c = a
@@ -116,7 +116,7 @@ say x == 10      @ true
 say x != 5       @ true
 ```
 
-```Zap
+```zap
 n: int = "42" -> int
 s: text = 42 -> text
 ```
@@ -125,7 +125,7 @@ s: text = 42 -> text
 
 ## Functions
 
-```Zap
+```zap
 @ Basic
 fun greet(name: text) -> none
   say "Hello {name}!"
@@ -159,7 +159,7 @@ square = fun(x: int) -> x * x
 
 ## Control Flow
 
-```Zap
+```zap
 @ If / else
 if age >= 18
   say "Adult"
@@ -240,7 +240,7 @@ end
 
 ## Loops
 
-```Zap
+```zap
 @ Repeat N times
 repeat 5 times
   say "Hello!"
@@ -279,7 +279,7 @@ end
 
 ## Classes & OOP
 
-```Zap
+```zap
 @ Basic class
 class Dog
   pub name: text
@@ -408,7 +408,7 @@ end
 
 ## Enums
 
-```Zap
+```zap
 enum Direction
   North, South, East, West
 end
@@ -443,7 +443,7 @@ say Color.Red   @ "#ff0000"
 
 A lightweight named data structure — safer than tuples, simpler than classes:
 
-```Zap
+```zap
 record Point
   x: float
   y: float
@@ -466,7 +466,7 @@ say p.x   @ 1.0
 
 ## Error Handling
 
-```Zap
+```zap
 @ Try / catch / always
 try
   x = divide(10, 0)
@@ -521,7 +521,7 @@ end
 
 ## Modules
 
-```Zap
+```zap
 @ Import whole module
 use math
 
@@ -569,7 +569,7 @@ The `lazy` keyword defers computation until the value is first accessed, then ca
 
 ### Lazy Variables
 
-```Zap
+```zap
 lazy expensive = loadFromDisk("data.json")
 
 @ Nothing loads here ↑
@@ -581,7 +581,7 @@ say expensive   @ uses cache
 
 ### Lazy Module Imports
 
-```Zap
+```zap
 lazy use math
 lazy use net.http as http
 
@@ -596,7 +596,7 @@ end
 
 Lazy imports are especially useful for conditional code paths:
 
-```Zap
+```zap
 lazy use net.http as http
 
 if connected
@@ -612,7 +612,7 @@ Note: when using `lazy use`, import the whole module rather than destructuring. 
 
 Arguments are not evaluated until actually used inside the function:
 
-```Zap
+```zap
 fun log(msg: lazy text) -> none
   if debugMode
     say msg   @ only evaluated if debugMode is true
@@ -626,7 +626,7 @@ log(buildHugeString())   @ never runs if debug is off
 
 Produce values one at a time instead of building a full list in memory:
 
-```Zap
+```zap
 lazy fun range(start: int, end: int) -> int
   every i in start..end
     yield i
@@ -643,7 +643,7 @@ end
 
 ### Lazy Properties on Classes
 
-```Zap
+```zap
 class Report
   lazy pub summary: text = buildSummary()   @ deferred until accessed
 end
@@ -658,7 +658,7 @@ say r.summary   @ uses cache
 
 ## Quality of Life
 
-```Zap
+```zap
 @ String interpolation
 say "Hello {name}, you are {age} years old!"
 say "Next year: {age + 1}"
@@ -703,7 +703,7 @@ x--
 
 ### Built-in Methods
 
-```Zap
+```zap
 @ Text
 "hello".upper()             @ "HELLO"
 "HELLO".lower()             @ "hello"
@@ -733,7 +733,7 @@ nums.reduce(fun(a, b) -> a + b)
 
 Built-in test syntax — no framework needed:
 
-```Zap
+```zap
 test "adds two numbers"
   expect add(1, 2) == 3
 end
@@ -752,14 +752,14 @@ end
 Run tests with:
 
 ```text
-Zap test main.Zap
+Zap --test main.zap
 ```
 
 ---
 
 ## Full Example
 
-```Zap
+```zap
 use math { sqrt }
 
 class Player
@@ -808,7 +808,7 @@ end
 
 ## Comments
 
-```Zap
+```zap
 @ This is a single line comment
 
 @--
@@ -858,7 +858,3 @@ end
 ---
 
 > Zap — Simple syntax. Fast execution. Fun to write. ⚡
-
----
-
-> I name language, and it duplicates, bruh

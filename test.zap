@@ -32,8 +32,8 @@ test "string literal"
 end
 
 test "string interpolation"
-  name = "Zep"
-  expect "Hello {name}!" == "Hello Zep!"
+  name = "Zap"
+  expect "Hello {name}!" == "Hello Zap!"
 end
 
 test "multiline string"

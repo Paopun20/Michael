@@ -3,7 +3,6 @@ import sys.io.FileInput;
 import Sys;
 import paopao.zap.Interp;
 import paopao.zap.Parser;
-import paopao.zap.Lexer;
 import paopao.zap.Error;
 import haxe.io.Path;
 
@@ -11,14 +10,32 @@ class Main {
 	static function main() {
 		var args = Sys.args();
 
-		if (args.length == 0)
-			runRepl();
+		// On the cpp target Haxe appends the calling directory as the last
+		// element — pop() strips it on that target while leaving file args intact.
+		var fileArg = args.pop();
 
-		// Bare  zap <file.zap>  shorthand
-		if (StringTools.endsWith(args[0], ".zap"))
-			runFile(args[0], false);
-		else {
-			Sys.stderr().writeString('Unknown command "${args[0]}"\n');
+		// Strip leading flags before deciding what to do
+		var testMode = false;
+		while (args.length > 0 && StringTools.startsWith(args[0], "--")) {
+			switch args.shift() {
+				case "--test":
+					testMode = true;
+				case flag:
+					Sys.stderr().writeString('Unknown flag "$flag"\n');
+					Sys.exit(1);
+			}
+		}
+
+		// Nothing left after popping and flag-stripping → REPL
+		if (fileArg == null || fileArg == "") {
+			runRepl();
+			return;
+		}
+
+		if (StringTools.endsWith(fileArg, ".zap") || StringTools.endsWith(fileArg, ".zep")) {
+			runFile(fileArg, testMode);
+		} else {
+			Sys.stderr().writeString('Unknown command "$fileArg"\n');
 			Sys.exit(1);
 		}
 
@@ -37,9 +54,8 @@ class Main {
 		interp.printFn = s -> Sys.println(s);
 
 		try {
-			var tokens = new Lexer().tokenize(src, path);
 			var parser = new Parser();
-			var stmts = parser.parse(tokens, path);
+			var stmts = parser.parseString(src, path);
 			interp.run(stmts, parser.varNames);
 		} catch (e:Error) {
 			Sys.stderr().writeString(e.toString() + "\n");
@@ -58,11 +74,12 @@ class Main {
 
 	// REPL
 	static function runRepl():Void {
-		Sys.println("zap - Dev Build");
-		Sys.println("Type \"help\" , \"copyright\", \"credits\" or \"license\" for more information.");
+		Sys.println("zap repl - Dev Build");
+		Sys.println("Type \":help\" for commands.");
+		Sys.println("Type \":exit\" or press Ctrl+C to exit.");
 
 		var interp = new Interp();
-		interp.printFn = s -> Sys.println(s);
+		interp.printFn = (s:String) -> Sys.println(s);
 
 		// Keep a shared parser varNames table across lines so names declared
 		// in one line are visible in the next.
@@ -75,18 +92,28 @@ class Main {
 			line = StringTools.trim(line);
 			if (line != null)
 				switch (line.toLowerCase()) {
-					case "help":
-						Sys.println("It no help in Dev Build, sorry!");
-						Sys.println("Check the GitHub repo for docs and examples");
-						Sys.println("https://github.com/Paopun20/Zap");
-					case "copyright":
-						Sys.println("Copyright (c) 2023 Zap Developers");
-					case "credits":
-						Sys.println("Developed by Paopun20 and contributors");
-					case "license":
+					case ":help":
+						Sys.println("Available commands:");
+						Sys.println("  :help       Show this message");
+						Sys.println("  :copyright   Show copyright information");
+						Sys.println("  :credits     Show credits");
+						Sys.println("  :license     Show license information");
+						Sys.println("  :reset       Reset REPL state");
+						Sys.println("  :exit        Exit the REPL");
+					case ":copyright":
+						Sys.println("Copyright (c) 2026 Zap Developers");
+					case ":credits":
+						Sys.println("Developed by PaoPaoDev and contributors");
+					case ":license":
 						Sys.println("Licensed under the MIT License");
 						Sys.println("https://opensource.org/licenses/MIT");
-					case "exit":
+					case ":reset":
+						interp = new Interp();
+						interp.printFn = s -> Sys.println(s);
+						varNames = [];
+						Sys.println("REPL state reset.");
+						continue;
+					case ":exit":
 						return;
 					default:
 						var src = line;
@@ -100,16 +127,15 @@ class Main {
 						}
 
 						try {
-							var tokens = new Lexer().tokenize(src, "<repl>");
-							var parser = new Parser();
+							var parser = (new Parser());
 							// Seed the parser with accumulated names so prior bindings resolve
-							parser.parse(tokens, "<repl>");
+							parser.parseString(src, "<repl>");
 							// Merge any new names into the shared table
 							for (n in parser.varNames)
 								if (varNames.indexOf(n) == -1)
 									varNames.push(n);
 
-							var stmts = new Parser().parse(new Lexer().tokenize(src, "<repl>"), "<repl>");
+							var stmts = (new Parser()).parseString(src, "<repl>");
 							var result = interp.run(stmts, varNames);
 							if (result != null)
 								Sys.println("=> " + interp.valToString(result));
@@ -123,24 +149,34 @@ class Main {
 	}
 
 	static function needsContinuation(src:String):Bool {
-		var openers = ~/\b(if|unless|while|repeat|every|match|fun|class|interface|abstract|record|enum|try)\b/g;
-		var closers = ~/\bend\b/g;
+		var depth = 0;
+		// Only `abstract fun name(...) -> type` has no body.
+		// All other `fun` declarations open a block that needs `end`.
+		var abstractSig = ~/\babstract\b.*\bfun\b/;
 
-		var opens = 0;
-		var s = src;
-		while (openers.match(s)) {
-			opens++;
-			s = openers.matchedRight();
+		for (line in src.split("\n")) {
+			var t = StringTools.trim(line);
+			if (t == "" || StringTools.startsWith(t, "@")) continue;
+
+			// Block openers (excluding `fun` — handled separately below)
+			var openers = ~/\b(if|unless|while|repeat|every|match|init|class|interface|record|enum|try|test)\b/g;
+			var s = t;
+			while (openers.match(s)) { depth++; s = openers.matchedRight(); }
+
+			// `fun` opens a block unless the line is an abstract declaration
+			if (!abstractSig.match(t)) {
+				var funR = ~/\bfun\b/g;
+				s = t;
+				while (funR.match(s)) { depth++; s = funR.matchedRight(); }
+			}
+
+			// `end` closes a block
+			var endR = ~/\bend\b/g;
+			s = t;
+			while (endR.match(s)) { depth--; s = endR.matchedRight(); }
 		}
 
-		var closes = 0;
-		s = src;
-		while (closers.match(s)) {
-			closes++;
-			s = closers.matchedRight();
-		}
-
-		return opens > closes;
+		return depth > 0;
 	}
 
 	/** Read a line from stdin; returns null on EOF. */

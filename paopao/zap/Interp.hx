@@ -22,7 +22,7 @@ private class ContinueSig extends Signal {
 	public function new() {}
 }
 
-private class ZepThrow extends Signal {
+private class ZapThrow extends Signal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -51,8 +51,8 @@ class Env {
 	public function get(name:String):Dynamic {
 		if (vars.exists(name)) {
 			var v = vars.get(name);
-			if (Std.isOfType(v, ZepLazy)) {
-				v = (cast v : ZepLazy).force();
+			if (Std.isOfType(v, ZapLazy)) {
+				v = (cast v : ZapLazy).force();
 				vars.set(name, v);
 			}
 			return v;
@@ -84,7 +84,7 @@ class Env {
 		return new Env(this);
 }
 
-class ZepFunction {
+class ZapFunction {
 	public var name:Null<String>;
 	public var args:Array<Argument>;
 	public var body:Null<Expr>; // null for natives
@@ -93,7 +93,7 @@ class ZepFunction {
 	public var isGenerator:Bool;
 	public var native:Null<Array<Dynamic>->Dynamic>;
 
-	public function new(name, args, body, closure, varNames, isGenerator) {
+	public function new(name:Null<String>, args:Array<Argument>, body:Null<Expr>, closure:Env, varNames:VariableInfo, isGenerator:Bool) {
 		this.name = name;
 		this.args = args;
 		this.body = body;
@@ -102,20 +102,20 @@ class ZepFunction {
 		this.isGenerator = isGenerator;
 	}
 
-	public static function ofNative(name:String, fn:Array<Dynamic>->Dynamic):ZepFunction {
-		var f = new ZepFunction(name, [], null, new Env(), [], false);
+	public static function ofNative(name:String, fn:Array<Dynamic>->Dynamic):ZapFunction {
+		var f = new ZapFunction(name, [], null, new Env(), [], false);
 		f.native = fn;
 		return f;
 	}
 }
 
 /** A class definition — holds field defaults, methods, and static members. */
-class ZepClass {
+class ZapClass {
 	public var name:String;
-	public var parent:Null<ZepClass>;
+	public var parent:Null<ZapClass>;
 	public var interfaces:Array<String>;
 	public var fieldDefaults:StringMap<Null<Dynamic>>; // declared instance fields
-	public var methods:StringMap<ZepFunction>;
+	public var methods:StringMap<ZapFunction>;
 	public var staticFields:StringMap<Dynamic>;
 	public var isAbstract:Bool;
 	public var isInterface:Bool;
@@ -129,17 +129,17 @@ class ZepClass {
 	}
 }
 
-/** A live object instance. Also backs the IZepCustomBehaviour contract. */
-class ZepInstance implements IZepCustomBehaviour {
-	public var klass:ZepClass;
+/** A live object instance. Also backs the IZapCustomBehaviour contract. */
+class ZapInstance implements IZapCustomBehaviour {
+	public var klass:ZapClass;
 	public var fields:StringMap<Dynamic>;
 
-	public function new(klass:ZepClass) {
+	public function new(klass:ZapClass) {
 		this.klass = klass;
 		this.fields = new StringMap();
 		// Seed with defaults from the entire inheritance chain (child wins).
 		var k = klass;
-		var chain:Array<ZepClass> = [];
+		var chain:Array<ZapClass> = [];
 		while (k != null) {
 			chain.unshift(k);
 			k = k.parent;
@@ -156,10 +156,9 @@ class ZepInstance implements IZepCustomBehaviour {
 		var k = klass;
 		while (k != null) {
 			if (k.methods.exists(name)) {
-				var fn:ZepFunction = k.methods.get(name);
+				var fn:ZapFunction = k.methods.get(name);
 				// Bind self so method bodies can reference it.
-				var bound = new ZepFunction(fn.name, fn.args, fn.body,
-				                            fn.closure.child(), fn.varNames, fn.isGenerator);
+				var bound = new ZapFunction(fn.name, fn.args, fn.body, fn.closure.child(), fn.varNames, fn.isGenerator);
 				bound.closure.define("self", this);
 				bound.native = fn.native;
 				return bound;
@@ -176,7 +175,7 @@ class ZepInstance implements IZepCustomBehaviour {
 }
 
 /** An enum type definition.  Color.Red returns the variant value. */
-class ZepEnumDef {
+class ZapEnumDef {
 	public var name:String;
 	public var variants:StringMap<Dynamic>;
 
@@ -187,7 +186,7 @@ class ZepEnumDef {
 }
 
 /** An inclusive integer range   from..to */
-class ZepRange {
+class ZapRange {
 	public var from:Int;
 	public var to:Int;
 
@@ -213,7 +212,7 @@ class ZepRange {
 }
 
 /** A deferred lazy value — evaluates exactly once on first access. */
-class ZepLazy {
+class ZapLazy {
 	var thunk:Void->Dynamic;
 	var computed = false;
 	var cached:Dynamic;
@@ -285,14 +284,6 @@ class Interp {
 		return last;
 	}
 
-	/** Convenience: lex + parse + run in one call. */
-	public function runSource(src:String, ?fileName:String):Dynamic {
-		var toks = new Lexer().tokenize(src, fileName);
-		var parser = new Parser();
-		var stmts = parser.parse(toks, fileName);
-		return run(stmts, parser.varNames);
-	}
-
 	// Core evaluator
 	function eval(e:Expr):Dynamic {
 		return switch e.expr {
@@ -302,7 +293,7 @@ class Interp {
 			case EVarDecl(name, _, valExpr, _, isLazy):
 				var v:Dynamic = switch [valExpr, isLazy] {
 					case [null, _]: null;
-					case [ve, true]: new ZepLazy(() -> eval(ve));
+					case [ve, true]: new ZapLazy(() -> eval(ve));
 					case [ve, false]: eval(ve);
 				}
 				env.define(name, v);
@@ -367,7 +358,7 @@ class Interp {
 				buf.toString();
 
 			case EFunction(name, args, _, body, isLazy):
-				var fn = new ZepFunction(name, args, body, env, varNames, isLazy);
+				var fn = new ZapFunction(name, args, body, env, varNames, isLazy);
 				if (name != null && !StringTools.startsWith(name, "~s~"))
 					env.setOrDefine(name, fn);
 				fn;
@@ -456,13 +447,13 @@ class Interp {
 			case EStop: throw new StopSig();
 			case EContinue: throw new ContinueSig();
 
-			case EThrow(inner): throw new ZepThrow(eval(inner));
+			case EThrow(inner): throw new ZapThrow(eval(inner));
 
 			case ETry(body, catches, always):
 				var result:Dynamic = null;
 				try {
 					result = eval(body);
-				} catch (sig:ZepThrow) {
+				} catch (sig:ZapThrow) {
 					var handled = false;
 					for (c in catches) {
 						if (c.type == null || typeOf(sig.v) == c.type) {
@@ -501,7 +492,7 @@ class Interp {
 				v != null ? v : eval(def);
 
 			case ERange(from, to):
-				new ZepRange(Std.int(eval(from)), Std.int(eval(to)));
+				new ZapRange(Std.int(eval(from)), Std.int(eval(to)));
 
 			case EPipeline(lhs, rhs):
 				var v = eval(lhs);
@@ -522,7 +513,7 @@ class Interp {
 
 			case ENew(type, rawArgs):
 				var klass = env.get(type);
-				if (!Std.isOfType(klass, ZepClass))
+				if (!Std.isOfType(klass, ZapClass))
 					interpError('$type is not a class', e.line);
 				instantiate(cast klass, [for (a in rawArgs) eval(a)], new StringMap());
 
@@ -551,15 +542,15 @@ class Interp {
 					var threw = false;
 					try {
 						eval(inner);
-					} catch (_:ZepThrow) {
+					} catch (_:ZapThrow) {
 						threw = true;
 					}
 					if (!threw)
-						throw new ZepThrow("Expected an exception but none was thrown");
+						throw new ZapThrow("Expected an exception but none was thrown");
 				} else {
 					var v = eval(inner);
 					if (!isTruthy(v))
-						throw new ZepThrow('Assertion failed: expected truthy, got ${valToString(v)}');
+						throw new ZapThrow('Assertion failed: expected truthy, got ${valToString(v)}');
 				}
 				null;
 		}
@@ -607,14 +598,14 @@ class Interp {
 		var name = pipeIdx >= 0 ? nameAndParent.substring(0, pipeIdx) : nameAndParent;
 		var parentName = pipeIdx >= 0 ? nameAndParent.substring(pipeIdx + 1) : null;
 
-		var klass = new ZepClass(name);
+		var klass = new ZapClass(name);
 		klass.isAbstract = StringTools.startsWith(tag, "abstract:");
 		klass.isInterface = StringTools.startsWith(tag, "interface:");
 
 		// Resolve parent
 		if (parentName != null) {
 			var p = try env.get(parentName) catch (_:Dynamic) null;
-			if (Std.isOfType(p, ZepClass))
+			if (Std.isOfType(p, ZapClass))
 				klass.parent = cast p;
 		}
 
@@ -628,7 +619,7 @@ class Interp {
 				case EVarDecl(rawName, _, defExpr, _, isLazy):
 					var isStatic = StringTools.startsWith(rawName, "~s~");
 					var fname = isStatic ? rawName.substring(3) : rawName;
-					var dv:Dynamic = defExpr == null ? null : isLazy ? new ZepLazy(() -> eval(defExpr)) : eval(defExpr);
+					var dv:Dynamic = defExpr == null ? null : isLazy ? new ZapLazy(() -> eval(defExpr)) : eval(defExpr);
 					if (isStatic)
 						klass.staticFields.set(fname, dv);
 					else
@@ -638,7 +629,7 @@ class Interp {
 				case EFunction(rawName, args, _, body, isLazy) if (rawName != null):
 					var isStatic = StringTools.startsWith(rawName, "~s~");
 					var mname = isStatic ? rawName.substring(3) : rawName;
-					var fn = new ZepFunction(mname, args, body, env, varNames, isLazy);
+					var fn = new ZapFunction(mname, args, body, env, varNames, isLazy);
 					if (isStatic)
 						klass.staticFields.set(mname, fn);
 					else
@@ -654,7 +645,7 @@ class Interp {
 	// Enum definition
 	function defineEnum(tag:String, exprs:Array<Expr>):Dynamic {
 		var name = tag.substring("enum:".length);
-		var enumDef = new ZepEnumDef(name);
+		var enumDef = new ZapEnumDef(name);
 
 		for (i in 1...exprs.length)
 			switch exprs[i].expr {
@@ -685,7 +676,7 @@ class Interp {
 				}
 		];
 
-		var ctor = ZepFunction.ofNative(name, args -> {
+		var ctor = ZapFunction.ofNative(name, args -> {
 			var m = new StringMap<Dynamic>();
 			for (i => fname in fields)
 				m.set(fname, i < args.length ? args[i] : null);
@@ -729,8 +720,8 @@ class Interp {
 	}
 
 	function inCheck(val:Dynamic, container:Dynamic):Bool {
-		if (Std.isOfType(container, ZepRange))
-			return (cast container : ZepRange).contains(val);
+		if (Std.isOfType(container, ZapRange))
+			return (cast container : ZapRange).contains(val);
 		if (Std.isOfType(container, Array))
 			return (cast container : Array<Dynamic>).contains(val);
 		if (Std.isOfType(container, StringMap))
@@ -785,14 +776,14 @@ class Interp {
 		if (obj == null)
 			interpError('Cannot read field "$name" of none', line);
 
-		// IZepCustomBehaviour (ZepInstance implements this)
-		if (Std.isOfType(obj, IZepCustomBehaviour))
-			return (cast obj : IZepCustomBehaviour).zget(name);
+		// IZapCustomBehaviour (ZapInstance implements this)
+		if (Std.isOfType(obj, IZapCustomBehaviour))
+			return (cast obj : IZapCustomBehaviour).zget(name);
 
-		// ZepInstance — but IZepCustomBehaviour already handles it above
-		// ZepClass — static member or enum-variant-style access
-		if (Std.isOfType(obj, ZepClass)) {
-			var klass:ZepClass = cast obj;
+		// ZapInstance — but IZapCustomBehaviour already handles it above
+		// ZapClass — static member or enum-variant-style access
+		if (Std.isOfType(obj, ZapClass)) {
+			var klass:ZapClass = cast obj;
 			if (klass.staticFields.exists(name))
 				return klass.staticFields.get(name);
 			if (klass.methods.exists(name))
@@ -800,9 +791,9 @@ class Interp {
 			interpError('No static member "$name" on class ${klass.name}', line);
 		}
 
-		// ZepEnumDef  — variant access:  Direction.North
-		if (Std.isOfType(obj, ZepEnumDef)) {
-			var ed:ZepEnumDef = cast obj;
+		// ZapEnumDef  — variant access:  Direction.North
+		if (Std.isOfType(obj, ZapEnumDef)) {
+			var ed:ZapEnumDef = cast obj;
 			if (ed.variants.exists(name))
 				return ed.variants.get(name);
 			interpError('No variant "$name" in enum ${ed.name}', line);
@@ -830,13 +821,13 @@ class Interp {
 			return builtinMethod(obj, name, line);
 		}
 
-		// ZepRange
-		if (Std.isOfType(obj, ZepRange))
+		// ZapRange
+		if (Std.isOfType(obj, ZapRange))
 			switch name {
 				case "from":
-					return (cast obj : ZepRange).from;
+					return (cast obj : ZapRange).from;
 				case "to":
-					return (cast obj : ZepRange).to;
+					return (cast obj : ZapRange).to;
 				default:
 			}
 
@@ -851,12 +842,12 @@ class Interp {
 	function setField(obj:Dynamic, name:String, value:Dynamic, line:Int):Void {
 		if (obj == null)
 			interpError('Cannot set field "$name" of none', line);
-		if (Std.isOfType(obj, IZepCustomBehaviour)) {
-			(cast obj : IZepCustomBehaviour).zset(name, value);
+		if (Std.isOfType(obj, IZapCustomBehaviour)) {
+			(cast obj : IZapCustomBehaviour).zset(name, value);
 			return;
 		}
-		if (Std.isOfType(obj, ZepClass)) {
-			(cast obj : ZepClass).staticFields.set(name, value);
+		if (Std.isOfType(obj, ZapClass)) {
+			(cast obj : ZapClass).staticFields.set(name, value);
 			return;
 		}
 		if (Std.isOfType(obj, StringMap)) {
@@ -872,8 +863,8 @@ class Interp {
 			return (cast container : Array<Dynamic>)[Std.int(idx)];
 		if (Std.isOfType(container, StringMap))
 			return (cast container : StringMap<Dynamic>).get(valToString(idx));
-		if (Std.isOfType(container, ZepRange)) {
-			var r:ZepRange = cast container;
+		if (Std.isOfType(container, ZapRange)) {
+			var r:ZapRange = cast container;
 			var i = r.from + Std.int(idx);
 			return i <= r.to ? i : null;
 		}
@@ -886,8 +877,8 @@ class Interp {
 	}
 
 	// Method binding (closes over 'self')
-	function bindMethod(fn:ZepFunction, inst:ZepInstance):ZepFunction {
-		var bound = new ZepFunction(fn.name, fn.args, fn.body, fn.closure.child(), fn.varNames, fn.isGenerator);
+	function bindMethod(fn:ZapFunction, inst:ZapInstance):ZapFunction {
+		var bound = new ZapFunction(fn.name, fn.args, fn.body, fn.closure.child(), fn.varNames, fn.isGenerator);
 		bound.closure.define("self", inst);
 		bound.native = fn.native;
 		return bound;
@@ -897,11 +888,11 @@ class Interp {
 	function callValue(fn:Dynamic, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>, line:Int):Dynamic {
 		if (fn == null)
 			interpError("Cannot call none", line);
-		if (Std.isOfType(fn, ZepClass))
+		if (Std.isOfType(fn, ZapClass))
 			return instantiate(cast fn, posArgs, namedArgs);
-		if (!Std.isOfType(fn, ZepFunction))
+		if (!Std.isOfType(fn, ZapFunction))
 			interpError('${valToString(fn)} is not callable', line);
-		var f:ZepFunction = cast fn;
+		var f:ZapFunction = cast fn;
 		if (f.native != null)
 			return f.native(posArgs);
 		if (f.isGenerator)
@@ -909,7 +900,7 @@ class Interp {
 		return callFunction(f, posArgs, namedArgs);
 	}
 
-	function callFunction(f:ZepFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
+	function callFunction(f:ZapFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
 		var callEnv = f.closure.child();
 		bindArgs(f, posArgs, namedArgs, callEnv);
 		var saved = env;
@@ -924,7 +915,7 @@ class Interp {
 		return result;
 	}
 
-	function bindArgs(f:ZepFunction, pos:Array<Dynamic>, named:StringMap<Dynamic>, target:Env):Void {
+	function bindArgs(f:ZapFunction, pos:Array<Dynamic>, named:StringMap<Dynamic>, target:Env):Void {
 		for (i => arg in f.args) {
 			var argName = f.varNames.length > 0 ? f.varNames[arg.name] : Std.string(arg.name);
 			if (argName == null)
@@ -936,8 +927,8 @@ class Interp {
 	}
 
 	// Class instantiation
-	function instantiate(klass:ZepClass, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
-		var inst = new ZepInstance(klass);
+	function instantiate(klass:ZapClass, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
+		var inst = new ZapInstance(klass);
 
 		// Find and call init, walking up the chain
 		var k = klass;
@@ -947,7 +938,7 @@ class Interp {
 				// Provide super() as a callable that delegates to the parent's init
 				if (klass.parent != null) {
 					var parentClass = klass.parent;
-					initFn.closure.define("super", ZepFunction.ofNative("super", args -> {
+					initFn.closure.define("super", ZapFunction.ofNative("super", args -> {
 						var pk = parentClass;
 						while (pk != null) {
 							if (pk.methods.exists("init")) {
@@ -972,7 +963,7 @@ class Interp {
 	// Haxe has no coroutines, so we run the body to completion while routing
 	// all yield statements into a collector array.  The result is a plain list
 	// whose iterator the caller can use in  every x in gen()  etc.
-	function runGenerator(f:ZepFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Array<Dynamic> {
+	function runGenerator(f:ZapFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Array<Dynamic> {
 		var results:Array<Dynamic> = [];
 		var prevCollector = yieldCollector;
 		yieldCollector = results;
@@ -1036,8 +1027,8 @@ class Interp {
 
 			// Enum-variant match  Direction.North
 			case EField(enumExpr, variantName): var ed = eval(enumExpr); Std.isOfType(ed,
-					ZepEnumDef) && (cast ed : ZepEnumDef).variants.exists(variantName)
-					&& valEq(subject, (cast ed : ZepEnumDef).variants.get(variantName));
+					ZapEnumDef) && (cast ed : ZapEnumDef).variants.exists(variantName)
+					&& valEq(subject, (cast ed : ZapEnumDef).variants.get(variantName));
 
 			// Type-name pattern  int  text  float  bool  …
 			case EIdent(typeName) if (isBuiltinType(typeName)):
@@ -1099,16 +1090,16 @@ class Interp {
 			return "list";
 		if (Std.isOfType(v, StringMap))
 			return "map";
-		if (Std.isOfType(v, ZepFunction))
+		if (Std.isOfType(v, ZapFunction))
 			return "fun";
-		if (Std.isOfType(v, ZepClass))
+		if (Std.isOfType(v, ZapClass))
 			return "class";
-		if (Std.isOfType(v, ZepEnumDef))
+		if (Std.isOfType(v, ZapEnumDef))
 			return "enum";
-		if (Std.isOfType(v, ZepRange))
+		if (Std.isOfType(v, ZapRange))
 			return "range";
-		if (Std.isOfType(v, ZepInstance))
-			return (cast v : ZepInstance).klass.name;
+		if (Std.isOfType(v, ZapInstance))
+			return (cast v : ZapInstance).klass.name;
 		return "any";
 	}
 
@@ -1119,8 +1110,8 @@ class Interp {
 	function toIterable(v:Dynamic, line:Int):Array<Dynamic> {
 		if (Std.isOfType(v, Array))
 			return cast v;
-		if (Std.isOfType(v, ZepRange))
-			return (cast v : ZepRange).toArray();
+		if (Std.isOfType(v, ZapRange))
+			return (cast v : ZapRange).toArray();
 		if (Std.isOfType(v, StringMap))
 			return [for (k in (cast v : StringMap<Dynamic>).keys()) k];
 		if (Std.isOfType(v, String))
@@ -1134,16 +1125,16 @@ class Interp {
 		if (Std.isOfType(obj, String)) {
 			var s:String = cast obj;
 			return switch name {
-				case "upper": ZepFunction.ofNative("upper", _ -> s.toUpperCase());
-				case "lower": ZepFunction.ofNative("lower", _ -> s.toLowerCase());
-				case "trim": ZepFunction.ofNative("trim", _ -> StringTools.trim(s));
-				case "split": ZepFunction.ofNative("split", a -> (s.split(a[0]) : Array<Dynamic>));
-				case "contains": ZepFunction.ofNative("contains", a -> StringTools.contains(s, a[0]));
-				case "startsWith": ZepFunction.ofNative("startsWith", a -> StringTools.startsWith(s, a[0]));
-				case "endsWith": ZepFunction.ofNative("endsWith", a -> StringTools.endsWith(s, a[0]));
-				case "replace": ZepFunction.ofNative("replace", a -> StringTools.replace(s, a[0], a[1]));
-				case "indexOf": ZepFunction.ofNative("indexOf", a -> s.indexOf(a[0]));
-				case "repeat": ZepFunction.ofNative("repeat", a -> {
+				case "upper": ZapFunction.ofNative("upper", _ -> s.toUpperCase());
+				case "lower": ZapFunction.ofNative("lower", _ -> s.toLowerCase());
+				case "trim": ZapFunction.ofNative("trim", _ -> StringTools.trim(s));
+				case "split": ZapFunction.ofNative("split", a -> (s.split(a[0]) : Array<Dynamic>));
+				case "contains": ZapFunction.ofNative("contains", a -> StringTools.contains(s, a[0]));
+				case "startsWith": ZapFunction.ofNative("startsWith", a -> StringTools.startsWith(s, a[0]));
+				case "endsWith": ZapFunction.ofNative("endsWith", a -> StringTools.endsWith(s, a[0]));
+				case "replace": ZapFunction.ofNative("replace", a -> StringTools.replace(s, a[0], a[1]));
+				case "indexOf": ZapFunction.ofNative("indexOf", a -> s.indexOf(a[0]));
+				case "repeat": ZapFunction.ofNative("repeat", a -> {
 						var buf = new StringBuf();
 						for (_ in 0...Std.int(a[0]))
 							buf.add(s);
@@ -1157,33 +1148,33 @@ class Interp {
 		if (Std.isOfType(obj, Array)) {
 			var a:Array<Dynamic> = cast obj;
 			return switch name {
-				case "push": ZepFunction.ofNative("push", x -> {
+				case "push": ZapFunction.ofNative("push", x -> {
 						a.push(x[0]);
 						null;
 					});
-				case "pop": ZepFunction.ofNative("pop", _ -> a.pop());
-				case "first": ZepFunction.ofNative("first", _ -> a.length > 0 ? a[0] : null);
-				case "last": ZepFunction.ofNative("last", _ -> a.length > 0 ? a[a.length - 1] : null);
-				case "reverse": ZepFunction.ofNative("reverse", _ -> {
+				case "pop": ZapFunction.ofNative("pop", _ -> a.pop());
+				case "first": ZapFunction.ofNative("first", _ -> a.length > 0 ? a[0] : null);
+				case "last": ZapFunction.ofNative("last", _ -> a.length > 0 ? a[a.length - 1] : null);
+				case "reverse": ZapFunction.ofNative("reverse", _ -> {
 						var r = a.copy();
 						r.reverse();
 						r;
 					});
-				case "contains": ZepFunction.ofNative("contains", x -> a.contains(x[0]));
-				case "indexOf": ZepFunction.ofNative("indexOf", x -> a.indexOf(x[0]));
-				case "join": ZepFunction.ofNative("join", x -> a.map(valToString).join(x.length > 0 ? x[0] : ""));
-				case "slice": ZepFunction.ofNative("slice", x -> (a.slice(Std.int(x[0]), x.length > 1 ? Std.int(x[1]) : a.length) : Array<Dynamic>));
-				case "sort": ZepFunction.ofNative("sort", x -> {
+				case "contains": ZapFunction.ofNative("contains", x -> a.contains(x[0]));
+				case "indexOf": ZapFunction.ofNative("indexOf", x -> a.indexOf(x[0]));
+				case "join": ZapFunction.ofNative("join", x -> a.map(valToString).join(x.length > 0 ? x[0] : ""));
+				case "slice": ZapFunction.ofNative("slice", x -> (a.slice(Std.int(x[0]), x.length > 1 ? Std.int(x[1]) : a.length) : Array<Dynamic>));
+				case "sort": ZapFunction.ofNative("sort", x -> {
 						var r = a.copy();
-						if (x.length > 0 && Std.isOfType(x[0], ZepFunction))
+						if (x.length > 0 && Std.isOfType(x[0], ZapFunction))
 							r.sort((p, q) -> Std.int((callValue(x[0], [p, q], new StringMap(), 0) : Float)));
 						else
 							r.sort((p, q) -> valToString(p) < valToString(q) ? -1 : valToString(p) > valToString(q) ? 1 : 0);
 						r;
 					});
-				case "map": ZepFunction.ofNative("map", x -> (a.map(i -> callValue(x[0], [i], new StringMap(), 0)) : Array<Dynamic>));
-				case "filter": ZepFunction.ofNative("filter", x -> (a.filter(i -> isTruthy(callValue(x[0], [i], new StringMap(), 0))) : Array<Dynamic>));
-				case "reduce": ZepFunction.ofNative("reduce", x -> {
+				case "map": ZapFunction.ofNative("map", x -> (a.map(i -> callValue(x[0], [i], new StringMap(), 0)) : Array<Dynamic>));
+				case "filter": ZapFunction.ofNative("filter", x -> (a.filter(i -> isTruthy(callValue(x[0], [i], new StringMap(), 0))) : Array<Dynamic>));
+				case "reduce": ZapFunction.ofNative("reduce", x -> {
 						if (a.length == 0)
 							return null;
 						var acc = a[0];
@@ -1199,10 +1190,10 @@ class Interp {
 		if (Std.isOfType(obj, StringMap)) {
 			var m:StringMap<Dynamic> = cast obj;
 			return switch name {
-				case "keys": ZepFunction.ofNative("keys", _ -> ([for (k in m.keys()) k] : Array<Dynamic>));
-				case "values": ZepFunction.ofNative("values", _ -> ([for (v in m) v] : Array<Dynamic>));
-				case "exists": ZepFunction.ofNative("exists", a -> m.exists(a[0]));
-				case "remove": ZepFunction.ofNative("remove", a -> {
+				case "keys": ZapFunction.ofNative("keys", _ -> ([for (k in m.keys()) k] : Array<Dynamic>));
+				case "values": ZapFunction.ofNative("values", _ -> ([for (v in m) v] : Array<Dynamic>));
+				case "exists": ZapFunction.ofNative("exists", a -> m.exists(a[0]));
+				case "remove": ZapFunction.ofNative("remove", a -> {
 						m.remove(a[0]);
 						null;
 					});
@@ -1217,7 +1208,7 @@ class Interp {
 
 	// Module loading
 	function loadModule(path:String, mode:EImportMode, isLazy:Bool):Void {
-		var modVal:Dynamic = isLazy ? new ZepLazy(() -> resolveModule(path)) : resolveModule(path);
+		var modVal:Dynamic = isLazy ? new ZapLazy(() -> resolveModule(path)) : resolveModule(path);
 
 		switch mode {
 			case INormal:
@@ -1226,7 +1217,7 @@ class Interp {
 			case IAlias(alias):
 				env.setOrDefine(alias, modVal);
 			case IPartial(items):
-				var mod:Dynamic = Std.isOfType(modVal, ZepLazy) ? (cast modVal : ZepLazy).force() : modVal;
+				var mod:Dynamic = Std.isOfType(modVal, ZapLazy) ? (cast modVal : ZapLazy).force() : modVal;
 				for (item in items)
 					env.setOrDefine(item, getField(mod, item, 0));
 		}
@@ -1250,15 +1241,15 @@ class Interp {
 
 	function mathModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("sqrt", ZepFunction.ofNative("sqrt", a -> Math.sqrt(a[0])));
-		m.set("pow", ZepFunction.ofNative("pow", a -> Math.pow(a[0], a[1])));
-		m.set("abs", ZepFunction.ofNative("abs", a -> Math.abs(a[0])));
-		m.set("floor", ZepFunction.ofNative("floor", a -> Math.floor(a[0])));
-		m.set("ceil", ZepFunction.ofNative("ceil", a -> Math.ceil(a[0])));
-		m.set("round", ZepFunction.ofNative("round", a -> Math.round(a[0])));
-		m.set("min", ZepFunction.ofNative("min", a -> Math.min(a[0], a[1])));
-		m.set("max", ZepFunction.ofNative("max", a -> Math.max(a[0], a[1])));
-		m.set("log", ZepFunction.ofNative("log", a -> Math.log(a[0])));
+		m.set("sqrt", ZapFunction.ofNative("sqrt", a -> Math.sqrt(a[0])));
+		m.set("pow", ZapFunction.ofNative("pow", a -> Math.pow(a[0], a[1])));
+		m.set("abs", ZapFunction.ofNative("abs", a -> Math.abs(a[0])));
+		m.set("floor", ZapFunction.ofNative("floor", a -> Math.floor(a[0])));
+		m.set("ceil", ZapFunction.ofNative("ceil", a -> Math.ceil(a[0])));
+		m.set("round", ZapFunction.ofNative("round", a -> Math.round(a[0])));
+		m.set("min", ZapFunction.ofNative("min", a -> Math.min(a[0], a[1])));
+		m.set("max", ZapFunction.ofNative("max", a -> Math.max(a[0], a[1])));
+		m.set("log", ZapFunction.ofNative("log", a -> Math.log(a[0])));
 		m.set("pi", Math.PI);
 		m.set("e", Math.exp(1.0));
 		return m;
@@ -1266,28 +1257,28 @@ class Interp {
 
 	function textModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("split", ZepFunction.ofNative("split", a -> ((a[0] : String).split(a[1]) : Array<Dynamic>)));
-		m.set("join", ZepFunction.ofNative("join", a -> (a[0] : Array<Dynamic>).map(valToString).join(a[1])));
-		m.set("trim", ZepFunction.ofNative("trim", a -> StringTools.trim(a[0])));
-		m.set("upper", ZepFunction.ofNative("upper", a -> (a[0] : String).toUpperCase()));
-		m.set("lower", ZepFunction.ofNative("lower", a -> (a[0] : String).toLowerCase()));
-		m.set("replace", ZepFunction.ofNative("replace", a -> StringTools.replace(a[0], a[1], a[2])));
-		m.set("contains", ZepFunction.ofNative("contains", a -> StringTools.contains(a[0], a[1])));
-		m.set("startsWith", ZepFunction.ofNative("startsWith", a -> StringTools.startsWith(a[0], a[1])));
-		m.set("endsWith", ZepFunction.ofNative("endsWith", a -> StringTools.endsWith(a[0], a[1])));
+		m.set("split", ZapFunction.ofNative("split", a -> ((a[0] : String).split(a[1]) : Array<Dynamic>)));
+		m.set("join", ZapFunction.ofNative("join", a -> (a[0] : Array<Dynamic>).map(valToString).join(a[1])));
+		m.set("trim", ZapFunction.ofNative("trim", a -> StringTools.trim(a[0])));
+		m.set("upper", ZapFunction.ofNative("upper", a -> (a[0] : String).toUpperCase()));
+		m.set("lower", ZapFunction.ofNative("lower", a -> (a[0] : String).toLowerCase()));
+		m.set("replace", ZapFunction.ofNative("replace", a -> StringTools.replace(a[0], a[1], a[2])));
+		m.set("contains", ZapFunction.ofNative("contains", a -> StringTools.contains(a[0], a[1])));
+		m.set("startsWith", ZapFunction.ofNative("startsWith", a -> StringTools.startsWith(a[0], a[1])));
+		m.set("endsWith", ZapFunction.ofNative("endsWith", a -> StringTools.endsWith(a[0], a[1])));
 		return m;
 	}
 
 	function listModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("sort", ZepFunction.ofNative("sort", a -> {
+		m.set("sort", ZapFunction.ofNative("sort", a -> {
 			var r:Array<Dynamic> = (cast a[0] : Array<Dynamic>).copy();
 			r.sort((p, q) -> valToString(p) < valToString(q) ? -1 : 1);
 			r;
 		}));
-		m.set("filter", ZepFunction.ofNative("filter", a -> (a[0] : Array<Dynamic>).filter(x -> isTruthy(callValue(a[1], [x], new StringMap(), 0)))));
-		m.set("map", ZepFunction.ofNative("map", a -> ((a[0] : Array<Dynamic>).map(x -> callValue(a[1], [x], new StringMap(), 0)) : Array<Dynamic>)));
-		m.set("reduce", ZepFunction.ofNative("reduce", a -> {
+		m.set("filter", ZapFunction.ofNative("filter", a -> (a[0] : Array<Dynamic>).filter(x -> isTruthy(callValue(a[1], [x], new StringMap(), 0)))));
+		m.set("map", ZapFunction.ofNative("map", a -> ((a[0] : Array<Dynamic>).map(x -> callValue(a[1], [x], new StringMap(), 0)) : Array<Dynamic>)));
+		m.set("reduce", ZapFunction.ofNative("reduce", a -> {
 			var arr:Array<Dynamic> = a[0];
 			if (arr.length == 0)
 				return null;
@@ -1301,13 +1292,13 @@ class Interp {
 
 	function randomModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("int", ZepFunction.ofNative("int", a -> Std.int(Math.random() * ((a[1] : Int) - (a[0] : Int))) + (a[0] : Int)));
-		m.set("float", ZepFunction.ofNative("float", _ -> Math.random()));
-		m.set("pick", ZepFunction.ofNative("pick", a -> {
+		m.set("int", ZapFunction.ofNative("int", a -> Std.int(Math.random() * ((a[1] : Int) - (a[0] : Int))) + (a[0] : Int)));
+		m.set("float", ZapFunction.ofNative("float", _ -> Math.random()));
+		m.set("pick", ZapFunction.ofNative("pick", a -> {
 			var arr:Array<Dynamic> = a[0];
 			arr[Std.int(Math.random() * arr.length)];
 		}));
-		m.set("shuffle", ZepFunction.ofNative("shuffle", a -> {
+		m.set("shuffle", ZapFunction.ofNative("shuffle", a -> {
 			var arr:Array<Dynamic> = (cast a[0] : Array<Dynamic>).copy();
 			var n = arr.length;
 			while (n > 1) {
@@ -1324,27 +1315,27 @@ class Interp {
 
 	function jsonModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("parse", ZepFunction.ofNative("parse", a -> haxe.Json.parse(a[0])));
-		m.set("stringify", ZepFunction.ofNative("stringify", a -> haxe.Json.stringify(a[0])));
+		m.set("parse", ZapFunction.ofNative("parse", a -> haxe.Json.parse(a[0])));
+		m.set("stringify", ZapFunction.ofNative("stringify", a -> haxe.Json.stringify(a[0])));
 		return m;
 	}
 
 	function timeModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("now", ZepFunction.ofNative("now", _ -> Date.now().getTime()));
-		m.set("sleep", ZepFunction.ofNative("sleep", a -> {
+		m.set("now", ZapFunction.ofNative("now", _ -> Date.now().getTime()));
+		m.set("sleep", ZapFunction.ofNative("sleep", a -> {
 			Sys.sleep(a[0]);
 			null;
 		}));
-		m.set("format", ZepFunction.ofNative("format", a -> DateTools.format(Date.fromTime(a[0]), a[1])));
+		m.set("format", ZapFunction.ofNative("format", a -> DateTools.format(Date.fromTime(a[0]), a[1])));
 		return m;
 	}
 
 	function osModule():Dynamic {
 		var m = new StringMap<Dynamic>();
 		m.set("args", (Sys.args() : Array<Dynamic>));
-		m.set("env", ZepFunction.ofNative("env", a -> Sys.getEnv(a[0])));
-		m.set("exit", ZepFunction.ofNative("exit", a -> {
+		m.set("env", ZapFunction.ofNative("env", a -> Sys.getEnv(a[0])));
+		m.set("exit", ZapFunction.ofNative("exit", a -> {
 			Sys.exit(a.length > 0 ? Std.int(a[0]) : 0);
 			null;
 		}));
@@ -1353,35 +1344,35 @@ class Interp {
 
 	function assertModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("equal", ZepFunction.ofNative("equal", a -> {
+		m.set("equal", ZapFunction.ofNative("equal", a -> {
 			if (!valEq(a[0], a[1]))
-				throw new ZepThrow('Expected ${valToString(a[0])} == ${valToString(a[1])}');
+				throw new ZapThrow('Expected ${valToString(a[0])} == ${valToString(a[1])}');
 			null;
 		}));
-		m.set("notEqual", ZepFunction.ofNative("notEqual", a -> {
+		m.set("notEqual", ZapFunction.ofNative("notEqual", a -> {
 			if (valEq(a[0], a[1]))
-				throw new ZepThrow('Expected ${valToString(a[0])} != ${valToString(a[1])}');
+				throw new ZapThrow('Expected ${valToString(a[0])} != ${valToString(a[1])}');
 			null;
 		}));
-		m.set("true", ZepFunction.ofNative("true", a -> {
+		m.set("true", ZapFunction.ofNative("true", a -> {
 			if (!isTruthy(a[0]))
-				throw new ZepThrow('Expected truthy, got ${valToString(a[0])}');
+				throw new ZapThrow('Expected truthy, got ${valToString(a[0])}');
 			null;
 		}));
-		m.set("false", ZepFunction.ofNative("false", a -> {
+		m.set("false", ZapFunction.ofNative("false", a -> {
 			if (isTruthy(a[0]))
-				throw new ZepThrow('Expected falsy, got ${valToString(a[0])}');
+				throw new ZapThrow('Expected falsy, got ${valToString(a[0])}');
 			null;
 		}));
-		m.set("throws", ZepFunction.ofNative("throws", a -> {
+		m.set("throws", ZapFunction.ofNative("throws", a -> {
 			var threw = false;
 			try
 				callValue(a[0], [], new StringMap(), 0)
-			catch (_:ZepThrow) {
+			catch (_:ZapThrow) {
 				threw = true;
 			}
 			if (!threw)
-				throw new ZepThrow("Expected an exception");
+				throw new ZapThrow("Expected an exception");
 			null;
 		}));
 		return m;
@@ -1390,18 +1381,18 @@ class Interp {
 	// Global stdlib init
 	function loadStdlib():Void {
 		// say is also available as a global function (in addition to the keyword)
-		globals.define("say", ZepFunction.ofNative("say", a -> {
+		globals.define("say", ZapFunction.ofNative("say", a -> {
 			printFn(a.length > 0 ? valToString(a[0]) : "");
 			null;
 		}));
 		// Type conversion
-		globals.define("int", ZepFunction.ofNative("int", a -> Std.int(a[0])));
-		globals.define("float", ZepFunction.ofNative("float", a -> (a[0] : Float)));
-		globals.define("text", ZepFunction.ofNative("text", a -> valToString(a[0])));
-		globals.define("bool", ZepFunction.ofNative("bool", a -> isTruthy(a[0])));
+		globals.define("int", ZapFunction.ofNative("int", a -> Std.int(a[0])));
+		globals.define("float", ZapFunction.ofNative("float", a -> (a[0] : Float)));
+		globals.define("text", ZapFunction.ofNative("text", a -> valToString(a[0])));
+		globals.define("bool", ZapFunction.ofNative("bool", a -> isTruthy(a[0])));
 		// Introspection
-		globals.define("type", ZepFunction.ofNative("type", a -> typeOf(a[0])));
-		globals.define("len", ZepFunction.ofNative("len", a -> switch typeOf(a[0]) {
+		globals.define("type", ZapFunction.ofNative("type", a -> typeOf(a[0])));
+		globals.define("len", ZapFunction.ofNative("len", a -> switch typeOf(a[0]) {
 			case "text": (a[0] : String).length;
 			case "list": (cast a[0] : Array<Dynamic>).length;
 			case "map": {var n = 0; for (_ in (cast a[0] : StringMap<Dynamic>)) n++; n;}
@@ -1416,7 +1407,7 @@ class Interp {
 		var err:Null<String> = null;
 		try {
 			eval(body);
-		} catch (sig:ZepThrow) {
+		} catch (sig:ZapThrow) {
 			err = valToString(sig.v);
 		} catch (e:Error) {
 			err = e.toString();
@@ -1475,20 +1466,20 @@ class Interp {
 			return "true";
 		if (v == false)
 			return "false";
-		if (Std.isOfType(v, ZepFunction)) {
-			var f:ZepFunction = cast v;
+		if (Std.isOfType(v, ZapFunction)) {
+			var f:ZapFunction = cast v;
 			return f.name != null ? '<fun ${f.name}>' : '<fun>';
 		}
-		if (Std.isOfType(v, ZepClass))
-			return '<class ${(cast v : ZepClass).name}>';
-		if (Std.isOfType(v, ZepEnumDef))
-			return '<enum ${(cast v : ZepEnumDef).name}>';
-		if (Std.isOfType(v, ZepRange)) {
-			var r:ZepRange = cast v;
+		if (Std.isOfType(v, ZapClass))
+			return '<class ${(cast v : ZapClass).name}>';
+		if (Std.isOfType(v, ZapEnumDef))
+			return '<enum ${(cast v : ZapEnumDef).name}>';
+		if (Std.isOfType(v, ZapRange)) {
+			var r:ZapRange = cast v;
 			return '${r.from}..${r.to}';
 		}
-		if (Std.isOfType(v, ZepInstance)) {
-			var inst:ZepInstance = cast v;
+		if (Std.isOfType(v, ZapInstance)) {
+			var inst:ZapInstance = cast v;
 			// Call toString() if the class defines one
 			var k = inst.klass;
 			while (k != null) {

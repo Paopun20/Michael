@@ -3,6 +3,7 @@ package paopao.zap;
 import paopao.zap.Ast;
 import paopao.zap.Lexer;
 import paopao.zap.Error;
+
 using StringTools;
 
 class Parser {
@@ -11,6 +12,7 @@ class Parser {
 	var pos:Int;
 	var fileName:String;
 	var inMatchGuard:Bool = false;
+	var inInterface:Bool = false;
 
 	/**
 	 * Variable-name intern table.
@@ -27,7 +29,8 @@ class Parser {
 	 * Parse a flat token stream into a list of top-level statements.
 	 * Access `varNames` afterwards to get the variable name table.
 	 */
-	public function parse(tokens:Array<LTokenPos>, ?fileName:String):Array<Expr> {
+	public function parseString(src:String, fileName:String):Array<Expr> {
+		var tokens = new Lexer().tokenize(src, fileName);
 		this.tokens = tokens;
 		this.pos = 0;
 		this.varNames = [];
@@ -408,9 +411,8 @@ class Parser {
 			case TOp(OpSpread):
 				advance();
 				mk(ESpread(parseUnary()), line);
-			// Any keyword that wasn't handled as a syntax form above is treated
-			// as a variable name — covers params/variables named after keywords
-			// (stop, repeat, in, type, match, …).
+			// Any keyword not claimed above treated as a variable name
+			// (covers params/vars named after keywords: stop, repeat, in, type …)
 			case TKeyword(k):
 				advance();
 				mk(EIdent((k : String)), line);
@@ -454,7 +456,7 @@ class Parser {
 				}
 				// Recursively lex + parse the embedded expression
 				var subParser = new Parser();
-				var subStmts = subParser.parse(new Lexer().tokenize(inner.toString(), fileName), fileName);
+				var subStmts = subParser.parseString(inner.toString(), fileName);
 				var innerExpr = subStmts.length == 1 ? subStmts[0] : mk(EBlock(subStmts), line);
 				parts.push(IPExpr(innerExpr));
 			} else {
@@ -731,8 +733,6 @@ class Parser {
 	 */
 	function parseMatchPattern():Expr {
 		var line = curLine();
-		// Use parsePostfix so  Enum.Variant  patterns resolve the dot access.
-		// We stop before cast (->) since that token belongs to the arm arrow.
 		var e = parsePostfix();
 		if (matchOp(OpRange))
 			return mk(ERange(e, parsePostfix()), line);
@@ -765,21 +765,22 @@ class Parser {
 		var args = parseFunArgs();
 		expect(TPClose);
 
-		// Named function:  fun name(args) -> RetType \n body end
-		//   -> introduces a return type annotation, followed by a newline + block.
-		// Anonymous lambda:  fun(args) -> expr
-		//   -> introduces the body expression directly — no return type token.
+		// Interface method — consume optional return type then return, no body
+		if (inInterface) {
+			var ret:Null<String> = matchOp(OpArrow) ? parseFunRetType() : null;
+			return mk(EFunction(name, args, ret, mk(EEmpty, line), false), line);
+		}
 		if (name != null) {
+			// Named function:  fun name(args) -> RetType \n body end
 			var ret:Null<String> = matchOp(OpArrow) ? parseFunRetType() : null;
 			expectNewline();
 			var body = parseBlock();
 			expect(TKeyword(KEnd));
 			return mk(EFunction(name, args, ret, body, isLazy), line);
 		} else {
-			if (matchOp(OpArrow)) {
-				// Lambda:  fun(args) -> expr
+			// Anonymous lambda:  fun(args) -> expr   (-> is body, NOT return type)
+			if (matchOp(OpArrow))
 				return mk(EFunction(null, args, null, parseExpr(), isLazy), line);
-			}
 			// Block lambda:  fun(args) \n body end
 			expectNewline();
 			var body = parseBlock();
@@ -791,12 +792,11 @@ class Parser {
 	function parseFunArgs():Array<Argument> {
 		var args:Array<Argument> = [];
 		while (!check(TPClose)) {
-			matchOp(OpSpread); // spread ...name  — consumed, not yet stored in Argument
-			// Parameter names may shadow keywords (e.g. stop, repeat, in, type).
+			matchOp(OpSpread);
+			// Parameter names may shadow keywords (stop, repeat, in, type …)
 			var argName = expectFieldName();
 			var typeStr:Null<String> = null;
 			if (matchToken(TColon)) {
-				// lazy argument:  name: lazy type
 				var lazyPrefix = matchKw(KLazy) ? "lazy " : "";
 				typeStr = lazyPrefix + parseTypeAnnot();
 			}
@@ -970,7 +970,10 @@ class Parser {
 				ifaces.push(expectIdent());
 		}
 		expectNewline();
+		var savedInterface = inInterface;
+		inInterface = isInterface;
 		var members = parseClassBody();
+		inInterface = savedInterface;
 		expect(TKeyword(KEnd));
 		var tag = isInterface ? "interface" : isAbstract ? "abstract:class" : "class";
 		// Encode optional parent after "|":  "class:Cat|Animal"
@@ -1363,8 +1366,8 @@ class Parser {
 				parseError('Expected identifier, got ${tokenStr(peek().token)}');
 		}
 
-	/** Like expectIdent but also accepts keyword tokens as field names.
-	 *  Needed for  obj.repeat()  obj.type  etc. where the name is a keyword. */
+	/** Accepts both TIdent and TKeyword as a name — used for field access and
+	 *  parameter names where keywords are valid (repeat, stop, type, in …). */
 	function expectFieldName():String
 		return switch peek().token {
 			case TIdent(s):   advance(); s;

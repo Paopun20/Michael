@@ -214,7 +214,7 @@ enum ExprDef {
 typedef VariableType = Int;
 typedef VariableInfo = Array<String>;
 
-interface IZepCustomBehaviour {
+interface IZapCustomBehaviour {
 	public function zset(name:String, value:Dynamic):Dynamic;
 	public function zget(name:String):Dynamic;
 }

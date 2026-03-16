@@ -26,7 +26,7 @@ enum LToken {
 	TDot; // .
 	TColon; // :
 	TQuestion; // ?  (standalone — nullable type annotation  int?)
-	TNewline; // \n  statement separator (Zep has no semicolons)
+	TNewline; // \n  statement separator (Zap has no semicolons)
 	TEOF;
 }
 
@@ -286,13 +286,21 @@ class Lexer {
 			if (cc == 92 /*\\*/) {
 				pos++; // skip backslash
 				switch at(pos) {
-					case 110:  buf.addChar(10);  // \n
-					case 116:  buf.addChar(9);   // \t
-					case 114:  buf.addChar(13);  // \r
-					case 34:   buf.addChar(34);  // \"
-					case 92:   buf.addChar(92);  // \\
-					case 123:  buf.addChar(123); // \{
-					case c:    buf.addChar(92); buf.addChar(c);
+					case 110:
+						buf.addChar(10); // \n
+					case 116:
+						buf.addChar(9); // \t
+					case 114:
+						buf.addChar(13); // \r
+					case 34:
+						buf.addChar(34); // \"
+					case 92:
+						buf.addChar(92); // \\
+					case 123:
+						buf.addChar(123); // \{
+					case c:
+						buf.addChar(92);
+						buf.addChar(c);
 				}
 				pos++;
 				continue;
@@ -300,7 +308,8 @@ class Lexer {
 			buf.addChar(cc);
 			pos++;
 		}
-		if (!closed) lexError("Unterminated string literal");
+		if (!closed)
+			lexError("Unterminated string literal");
 		push(TConst(LCString(buf.toString())), start, pos);
 	}
 
@@ -322,7 +331,7 @@ class Lexer {
 			pos++;
 		}
 		var s = buf.toString();
-		// strip one leading newline and one trailing newline (Zep convention)
+		// strip one leading newline and one trailing newline (Zap convention)
 		if (s.length > 0 && s.charCodeAt(0) == 10)
 			s = s.substr(1);
 		if (s.length > 0 && s.charCodeAt(s.length - 1) == 10)
