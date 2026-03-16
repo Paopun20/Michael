@@ -1,12 +1,21 @@
-package paopao.zap;
+package paopao.mich;
 
 import haxe.ds.StringMap;
-import paopao.zap.Ast;
-import paopao.zap.Error;
+import paopao.mich.Ast;
+import paopao.mich.Error;
 
-private class Signal {}
+/**
+ * Internal signal type used by the interpreter to implement non-local control flow
+ * such as return, break, continue, throw, and yield.
+ */
+private class ZapSignal {}
 
-private class ReturnSig extends Signal {
+/**
+ * Return from a function with the given value.
+ * Caught by the function-call logic in eval(ECall) to implement return semantics
+ * across nested blocks.
+ */
+private class ReturnSig extends ZapSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -14,15 +23,24 @@ private class ReturnSig extends Signal {
 	}
 }
 
-private class StopSig extends Signal {
+/**
+ * Signal used to break out of a loop.
+ */
+private class StopSig extends ZapSignal {
 	public function new() {}
 }
 
-private class ContinueSig extends Signal {
+/**
+ * Signal used to continue to the next iteration of a loop.
+ */
+private class ContinueSig extends ZapSignal {
 	public function new() {}
 }
 
-private class ZapThrow extends Signal {
+/**
+ * Signal used to throw an exception.
+ */
+private class ZapThrow extends ZapSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -30,7 +48,10 @@ private class ZapThrow extends Signal {
 	}
 }
 
-private class YieldSig extends Signal {
+/**
+ * Signal used to suspend execution and yield a value (generator semantics).
+ */
+private class YieldSig extends ZapSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -38,6 +59,9 @@ private class YieldSig extends Signal {
 	}
 }
 
+/**
+ * An environment frame, mapping variable names to values. Also supports parent chaining
+ */
 class Env {
 	var vars:StringMap<Dynamic>;
 
@@ -233,8 +257,7 @@ class ZapLazy {
 // Test tracking
 typedef TestResult = {name:String, passed:Bool, error:Null<String>}
 
-// Interpreter
-
+/** The main interpreter class. Create a new instance for each top-level file or REPL session. */
 @:analyzer(optimize, local_dce, fusion, user_var_fusion)
 class Interp {
 	// State

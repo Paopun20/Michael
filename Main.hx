@@ -1,9 +1,9 @@
 import sys.io.File;
 import sys.io.FileInput;
 import Sys;
-import paopao.zap.Interp;
-import paopao.zap.Parser;
-import paopao.zap.Error;
+import paopao.mich.Interp;
+import paopao.mich.Parser;
+import paopao.mich.Error;
 import haxe.io.Path;
 
 class Main {
@@ -75,7 +75,7 @@ class Main {
 
 	// REPL
 	static function runRepl():Void {
-		Sys.println("zap repl - Dev Build");
+		Sys.println("Michael REPL - Dev Build");
 		Sys.println("Type \":help\" for commands.");
 		Sys.println("Type \":exit\" or press Ctrl+C to exit.");
 
@@ -84,7 +84,7 @@ class Main {
 
 		// Keep a shared parser varNames table across lines so names declared
 		// in one line are visible in the next.
-		var varNames:paopao.zap.Ast.VariableInfo = [];
+		var varNames:paopao.mich.Ast.VariableInfo = [];
 
 		while (true) {
 			Sys.print(">>> ");
@@ -102,7 +102,7 @@ class Main {
 						Sys.println("  :reset       Reset REPL state");
 						Sys.println("  :exit        Exit the REPL");
 					case ":copyright":
-						Sys.println("Copyright (c) 2026 Zap Developers");
+						Sys.println("Copyright (c) 2026 PaoPaoDev");
 					case ":credits":
 						Sys.println("Developed by PaoPaoDev and contributors");
 					case ":license":

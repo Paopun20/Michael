@@ -1,4 +1,4 @@
-## Contributing (a.k.a. “Fix it for me?”)
+# Contributing
 
 Pull requests are welcome! If you’d like to contribute, fork the repository and open a PR with your changes. Please test your updates,
 and if you modify the emulator file, include a clear description of what you changed along with screenshots of the test results.

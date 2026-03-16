@@ -1,8 +1,8 @@
-package paopao.zap;
+package paopao.mich;
 
-import paopao.zap.Ast;
-import paopao.zap.Lexer;
-import paopao.zap.Error;
+import paopao.mich.Ast;
+import paopao.mich.Lexer;
+import paopao.mich.Error;
 
 using StringTools;
 

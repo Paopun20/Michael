@@ -1,4 +1,4 @@
-# ⚡ Zap
+# Michael - Modern InterpreTed Core for High-level And Embeddable Languages
 
 > A fast, simple, and readable programming language. — bytecode compilation with a stack-based VM.
 > Inspired Python + Zig + Nim + Rust + Lua + Etc
@@ -7,7 +7,7 @@
 
 ## Features
 
-- Clean, readable syntax — no semicolons, no colons
+- Clean, readable syntax
 - Optional type annotations
 - Bytecode compilation
 - Stack-based VM
@@ -21,13 +21,12 @@
 - Lazy evaluation
 - Enums & records
 - Built-in testing
-- Code In Haxe
 
 ---
 
 ## Hello World
 
-```zap
+```mich
 say "Hello, World!"
 ```
 
@@ -53,7 +52,7 @@ say "Hello, World!"
 
 ## Variables
 
-```zap
+```mich
 @ Untyped
 x = 10
 name = "Alice"
@@ -90,7 +89,7 @@ const VERSION = "1.0.0"
 
 ### Type Alias
 
-```zap
+```mich
 alias ID = int
 alias Name = text
 ```
@@ -104,7 +103,7 @@ alias Name = text
 | `is`     | Same object (reference) | `a is b`     |
 | `is not` | Different object        | `a is not b` |
 
-```zap
+```mich
 a = "hello"
 b = "hello"
 c = a
@@ -118,7 +117,7 @@ say x == 10      @ true
 say x != 5       @ true
 ```
 
-```zap
+```mich
 n: int = "42" -> int
 s: text = 42 -> text
 ```
@@ -127,7 +126,7 @@ s: text = 42 -> text
 
 ## Functions
 
-```zap
+```mich
 @ Basic
 fun greet(name: text) -> none
   say "Hello {name}!"
@@ -161,7 +160,7 @@ square = fun(x: int) -> x * x
 
 ## Control Flow
 
-```zap
+```mich
 @ If / else
 if age >= 18
   say "Adult"
@@ -242,7 +241,7 @@ end
 
 ## Loops
 
-```zap
+```mich
 @ Repeat N times
 repeat 5 times
   say "Hello!"
@@ -281,7 +280,7 @@ end
 
 ## Classes & OOP
 
-```zap
+```mich
 @ Basic class
 class Dog
   pub name: text
@@ -410,7 +409,7 @@ end
 
 ## Enums
 
-```zap
+```mich
 enum Direction
   North, South, East, West
 end
@@ -445,7 +444,7 @@ say Color.Red   @ "#ff0000"
 
 A lightweight named data structure — safer than tuples, simpler than classes:
 
-```zap
+```mich
 record Point
   x: float
   y: float
@@ -468,7 +467,7 @@ say p.x   @ 1.0
 
 ## Error Handling
 
-```zap
+```mich
 @ Try / catch / always
 try
   x = divide(10, 0)
@@ -523,7 +522,7 @@ end
 
 ## Modules
 
-```zap
+```mich
 @ Import whole module
 use math
 
@@ -571,7 +570,7 @@ The `lazy` keyword defers computation until the value is first accessed, then ca
 
 ### Lazy Variables
 
-```zap
+```mich
 lazy expensive = loadFromDisk("data.json")
 
 @ Nothing loads here ↑
@@ -583,7 +582,7 @@ say expensive   @ uses cache
 
 ### Lazy Module Imports
 
-```zap
+```mich
 lazy use math
 lazy use net.http as http
 
@@ -598,7 +597,7 @@ end
 
 Lazy imports are especially useful for conditional code paths:
 
-```zap
+```mich
 lazy use net.http as http
 
 if connected
@@ -614,7 +613,7 @@ Note: when using `lazy use`, import the whole module rather than destructuring. 
 
 Arguments are not evaluated until actually used inside the function:
 
-```zap
+```mich
 fun log(msg: lazy text) -> none
   if debugMode
     say msg   @ only evaluated if debugMode is true
@@ -628,7 +627,7 @@ log(buildHugeString())   @ never runs if debug is off
 
 Produce values one at a time instead of building a full list in memory:
 
-```zap
+```mich
 lazy fun range(start: int, end: int) -> int
   every i in start..end
     yield i
@@ -645,7 +644,7 @@ end
 
 ### Lazy Properties on Classes
 
-```zap
+```mich
 class Report
   lazy pub summary: text = buildSummary()   @ deferred until accessed
 end
@@ -660,7 +659,7 @@ say r.summary   @ uses cache
 
 ## Quality of Life
 
-```zap
+```mich
 @ String interpolation
 say "Hello {name}, you are {age} years old!"
 say "Next year: {age + 1}"
@@ -705,7 +704,7 @@ x--
 
 ### Built-in Methods
 
-```zap
+```mich
 @ Text
 "hello".upper()             @ "HELLO"
 "HELLO".lower()             @ "hello"
@@ -735,7 +734,7 @@ nums.reduce(fun(a, b) -> a + b)
 
 Built-in test syntax — no framework needed:
 
-```zap
+```mich
 test "adds two numbers"
   expect add(1, 2) == 3
 end
@@ -761,7 +760,7 @@ Zap --test main.zap
 
 ## Full Example
 
-```zap
+```mich
 use math { sqrt }
 
 class Player
@@ -810,7 +809,7 @@ end
 
 ## Comments
 
-```zap
+```mich
 @ This is a single line comment
 
 @--
