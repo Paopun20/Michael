@@ -3,6 +3,11 @@ package paopao.mich;
 import haxe.ds.StringMap;
 import paopao.mich.Ast;
 import paopao.mich.Error;
+import paopao.mich.SimpleMacro;
+import paopao.mich.michLib.*;
+
+using StringTools;
+using Lambda;
 
 /**
  * Internal signal type used by the interpreter to implement non-local control flow
@@ -15,7 +20,7 @@ private class MichSignal {}
  * Caught by the function-call logic in eval(ECall) to implement return semantics
  * across nested blocks.
  */
-private class ReturnSig extends MichSignal {
+class ReturnSig extends MichSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -26,21 +31,21 @@ private class ReturnSig extends MichSignal {
 /**
  * Signal used to break out of a loop.
  */
-private class StopSig extends MichSignal {
+class StopSig extends MichSignal {
 	public function new() {}
 }
 
 /**
  * Signal used to continue to the next iteration of a loop.
  */
-private class ContinueSig extends MichSignal {
+class ContinueSig extends MichSignal {
 	public function new() {}
 }
 
 /**
  * Signal used to throw an exception.
  */
-private class MichThrow extends MichSignal {
+class MichThrow extends MichSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -51,7 +56,7 @@ private class MichThrow extends MichSignal {
 /**
  * Signal used to suspend execution and yield a value (generator semantics).
  */
-private class YieldSig extends MichSignal {
+class YieldSig extends MichSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -62,7 +67,7 @@ private class YieldSig extends MichSignal {
 /**
  * An environment frame, mapping variable names to values. Also supports parent chaining
  */
-class Env {
+final class Env {
 	var vars:StringMap<Dynamic>;
 
 	public var parent:Null<Env>;
@@ -108,7 +113,7 @@ class Env {
 		return new Env(this);
 }
 
-class MichFunction {
+final class MichFunction {
 	public var name:Null<String>;
 	public var args:Array<Argument>;
 	public var body:Null<Expr>; // null for natives
@@ -134,7 +139,7 @@ class MichFunction {
 }
 
 /** A class definition — holds field defaults, methods, and static members. */
-class MichClass {
+final class MichClass {
 	public var name:String;
 	public var parent:Null<MichClass>;
 	public var interfaces:Array<String>;
@@ -154,7 +159,7 @@ class MichClass {
 }
 
 /** A live object instance. Also backs the IMichCustomBehaviour contract. */
-class MichInstance implements IMichCustomBehaviour {
+final class MichInstance implements IMichCustomBehaviour {
 	public var klass:MichClass;
 	public var fields:StringMap<Dynamic>;
 
@@ -199,7 +204,7 @@ class MichInstance implements IMichCustomBehaviour {
 }
 
 /** An enum type definition.  Color.Red returns the variant value. */
-class MichEnumDef {
+final class MichEnumDef {
 	public var name:String;
 	public var variants:StringMap<Dynamic>;
 
@@ -210,7 +215,7 @@ class MichEnumDef {
 }
 
 /** An inclusive integer range   from..to */
-class MichRange {
+final class MichRange {
 	public var from:Int;
 	public var to:Int;
 
@@ -236,7 +241,7 @@ class MichRange {
 }
 
 /** A deferred lazy value — evaluates exactly once on first access. */
-class MichLazy {
+final class MichLazy {
 	var thunk:Void->Dynamic;
 	var computed = false;
 	var cached:Dynamic;
@@ -1256,159 +1261,65 @@ class Interp {
 		}
 	}
 
-	function resolveModule(path:String):Dynamic {
-		return switch path {
-			case "math": mathModule();
-			case "text": textModule();
-			case "list": listModule();
-			case "random": randomModule();
-			case "json": jsonModule();
-			case "time": timeModule();
-			case "os": osModule();
-			case "assert": assertModule();
-			default: interpError('Unknown module "$path"', 0);
-		}
-	}
-
-	// ---- Standard library modules -------------------------------------------
-
-	function mathModule():Dynamic {
-		var m = new StringMap<Dynamic>();
-		m.set("sqrt", MichFunction.ofNative("sqrt", a -> Math.sqrt(a[0])));
-		m.set("pow", MichFunction.ofNative("pow", a -> Math.pow(a[0], a[1])));
-		m.set("abs", MichFunction.ofNative("abs", a -> Math.abs(a[0])));
-		m.set("floor", MichFunction.ofNative("floor", a -> Math.floor(a[0])));
-		m.set("ceil", MichFunction.ofNative("ceil", a -> Math.ceil(a[0])));
-		m.set("round", MichFunction.ofNative("round", a -> Math.round(a[0])));
-		m.set("min", MichFunction.ofNative("min", a -> Math.min(a[0], a[1])));
-		m.set("max", MichFunction.ofNative("max", a -> Math.max(a[0], a[1])));
-		m.set("log", MichFunction.ofNative("log", a -> Math.log(a[0])));
-		m.set("pi", Math.PI);
-		m.set("e", Math.exp(1.0));
-		return m;
-	}
-
-	function textModule():Dynamic {
-		var m = new StringMap<Dynamic>();
-		m.set("split", MichFunction.ofNative("split", a -> ((a[0] : String).split(a[1]) : Array<Dynamic>)));
-		m.set("join", MichFunction.ofNative("join", a -> (a[0] : Array<Dynamic>).map(valToString).join(a[1])));
-		m.set("trim", MichFunction.ofNative("trim", a -> StringTools.trim(a[0])));
-		m.set("upper", MichFunction.ofNative("upper", a -> (a[0] : String).toUpperCase()));
-		m.set("lower", MichFunction.ofNative("lower", a -> (a[0] : String).toLowerCase()));
-		m.set("replace", MichFunction.ofNative("replace", a -> StringTools.replace(a[0], a[1], a[2])));
-		m.set("contains", MichFunction.ofNative("contains", a -> StringTools.contains(a[0], a[1])));
-		m.set("startsWith", MichFunction.ofNative("startsWith", a -> StringTools.startsWith(a[0], a[1])));
-		m.set("endsWith", MichFunction.ofNative("endsWith", a -> StringTools.endsWith(a[0], a[1])));
-		return m;
-	}
-
-	function listModule():Dynamic {
-		var m = new StringMap<Dynamic>();
-		m.set("sort", MichFunction.ofNative("sort", a -> {
-			var r:Array<Dynamic> = (cast a[0] : Array<Dynamic>).copy();
-			r.sort((p, q) -> valToString(p) < valToString(q) ? -1 : 1);
-			r;
-		}));
-		m.set("filter", MichFunction.ofNative("filter", a -> (a[0] : Array<Dynamic>).filter(x -> isTruthy(callValue(a[1], [x], new StringMap(), 0)))));
-		m.set("map", MichFunction.ofNative("map", a -> ((a[0] : Array<Dynamic>).map(x -> callValue(a[1], [x], new StringMap(), 0)) : Array<Dynamic>)));
-		m.set("reduce", MichFunction.ofNative("reduce", a -> {
-			var arr:Array<Dynamic> = a[0];
-			if (arr.length == 0)
-				return null;
-			var acc = arr[0];
-			for (i in 1...arr.length)
-				acc = callValue(a[1], [acc, arr[i]], new StringMap(), 0);
-			acc;
-		}));
-		return m;
-	}
-
-	function randomModule():Dynamic {
-		var m = new StringMap<Dynamic>();
-		m.set("int", MichFunction.ofNative("int", a -> Std.int(Math.random() * ((a[1] : Int) - (a[0] : Int))) + (a[0] : Int)));
-		m.set("float", MichFunction.ofNative("float", _ -> Math.random()));
-		m.set("pick", MichFunction.ofNative("pick", a -> {
-			var arr:Array<Dynamic> = a[0];
-			arr[Std.int(Math.random() * arr.length)];
-		}));
-		m.set("shuffle", MichFunction.ofNative("shuffle", a -> {
-			var arr:Array<Dynamic> = (cast a[0] : Array<Dynamic>).copy();
-			var n = arr.length;
-			while (n > 1) {
-				n--;
-				var k = Std.int(Math.random() * (n + 1));
-				var t = arr[k];
-				arr[k] = arr[n];
-				arr[n] = t;
-			}
-			arr;
-		}));
-		return m;
-	}
-
-	function jsonModule():Dynamic {
-		var m = new StringMap<Dynamic>();
-		m.set("parse", MichFunction.ofNative("parse", a -> haxe.Json.parse(a[0])));
-		m.set("stringify", MichFunction.ofNative("stringify", a -> haxe.Json.stringify(a[0])));
-		return m;
-	}
-
-	function timeModule():Dynamic {
-		var m = new StringMap<Dynamic>();
-		m.set("now", MichFunction.ofNative("now", _ -> Date.now().getTime()));
-		m.set("sleep", MichFunction.ofNative("sleep", a -> {
-			Sys.sleep(a[0]);
-			null;
-		}));
-		m.set("format", MichFunction.ofNative("format", a -> DateTools.format(Date.fromTime(a[0]), a[1])));
-		return m;
-	}
-
-	function osModule():Dynamic {
-		var m = new StringMap<Dynamic>();
-		m.set("args", (Sys.args() : Array<Dynamic>));
-		m.set("env", MichFunction.ofNative("env", a -> Sys.getEnv(a[0])));
-		m.set("exit", MichFunction.ofNative("exit", a -> {
-			Sys.exit(a.length > 0 ? Std.int(a[0]) : 0);
-			null;
-		}));
-		return m;
-	}
-
 	function assertModule():Dynamic {
 		var m = new StringMap<Dynamic>();
+
 		m.set("equal", MichFunction.ofNative("equal", a -> {
 			if (!valEq(a[0], a[1]))
 				throw new MichThrow('Expected ${valToString(a[0])} == ${valToString(a[1])}');
 			null;
 		}));
+
 		m.set("notEqual", MichFunction.ofNative("notEqual", a -> {
 			if (valEq(a[0], a[1]))
 				throw new MichThrow('Expected ${valToString(a[0])} != ${valToString(a[1])}');
 			null;
 		}));
+
 		m.set("true", MichFunction.ofNative("true", a -> {
 			if (!isTruthy(a[0]))
 				throw new MichThrow('Expected truthy, got ${valToString(a[0])}');
 			null;
 		}));
+
 		m.set("false", MichFunction.ofNative("false", a -> {
 			if (isTruthy(a[0]))
 				throw new MichThrow('Expected falsy, got ${valToString(a[0])}');
 			null;
 		}));
+
 		m.set("throws", MichFunction.ofNative("throws", a -> {
 			var threw = false;
+
 			try
 				callValue(a[0], [], new StringMap(), 0)
-			catch (_:MichThrow) {
+			catch (_:MichThrow)
 				threw = true;
-			}
+
 			if (!threw)
 				throw new MichThrow("Expected an exception");
+
 			null;
 		}));
+
 		return m;
+	}
+
+	// Standard of facking hardcode library modules, power by Simply Shity Macro
+	function resolveModule(path:String):Dynamic {
+		return switch path {
+			case "math": SimpleMacro.gen(MichMath);
+			case "text": SimpleMacro.gen(MichText);
+			case "list": SimpleMacro.gen(MichList);
+			case "random": SimpleMacro.gen(MichRandom);
+			case "json": SimpleMacro.gen(MichJson);
+			case "time": SimpleMacro.gen(MichTime);
+			case "os": SimpleMacro.gen(MichOS);
+			case "io": SimpleMacro.gen(MichIO);
+			case "file": SimpleMacro.gen(MichFile);
+			case "assert": assertModule(); // not a real module, just a convenient place for test assertions
+			default: interpError('Unknown module "$path"', 0);
+		}
 	}
 
 	// Global stdlib init
@@ -1543,14 +1454,8 @@ class Interp {
 		}
 
 	inline function isSentinel(s:String):Bool
-		return StringTools.startsWith(s, "class:")
-			|| StringTools.startsWith(s, "abstract:")
-			|| StringTools.startsWith(s, "interface:")
-			|| StringTools.startsWith(s, "enum:")
-			|| StringTools.startsWith(s, "record:")
-			|| StringTools.startsWith(s, "alias:")
-			|| StringTools.startsWith(s, "module:")
-			|| StringTools.startsWith(s, "iface:");
+		return s.startsWith("class:") || s.startsWith("abstract:") || s.startsWith("interface:") || s.startsWith("enum:") || s.startsWith("record:")
+			|| s.startsWith("alias:") || s.startsWith("module:") || s.startsWith("iface:");
 
 	function interpError(msg:String, line:Int):Dynamic
 		throw new Error(ERunError(msg), 0, 0, "", line);

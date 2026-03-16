@@ -6,6 +6,8 @@ import paopao.mich.Parser;
 import paopao.mich.Error;
 import haxe.io.Path;
 
+using StringTools;
+
 class Main {
 	static function main() {
 		var args = Sys.args();
@@ -16,7 +18,7 @@ class Main {
 
 		// Strip leading flags before deciding what to do
 		var testMode = false;
-		while (args.length > 0 && StringTools.startsWith(args[0], "--")) {
+		while (args.length > 0 && args[0].startsWith("--")) {
 			switch args.shift() {
 				case "--test":
 					testMode = true;
@@ -32,7 +34,7 @@ class Main {
 			return;
 		}
 
-		if (StringTools.endsWith(fileArg, ".mich") || StringTools.endsWith(fileArg, ".mich")) {
+		if (true) {
 			runFile(fileArg, testMode);
 		} else {
 			Sys.stderr().writeString('Unknown command "$fileArg"\n');
@@ -42,10 +44,10 @@ class Main {
 		Sys.exit(0);
 	}
 
-	// File runner
+	// Load File and Run
 	static function runFile(path:String, testMode:Bool):Void {
 		if (!sys.FileSystem.exists(path)) {
-			Sys.stderr().writeString('michael: file not found: $path\n');
+			Sys.stderr().writeString('michael: can\'t open file: $path (No such file or directory)\n');
 			Sys.exit(1);
 		}
 
@@ -79,6 +81,8 @@ class Main {
 		Sys.println("Type \":help\" for commands.");
 		Sys.println("Type \":exit\" or press Ctrl+C to exit.");
 
+		var cline = 0;
+
 		var interp = new Interp();
 		interp.printFn = (s:String) -> Sys.println(s);
 
@@ -87,11 +91,11 @@ class Main {
 		var varNames:paopao.mich.Ast.VariableInfo = [];
 
 		while (true) {
-			Sys.print(">>> ");
+			Sys.print('mich:${cline + 1} > ');
 			Sys.stdout().flush();
 			var line = readLine();
-			line = StringTools.trim(line);
-			if (line != null)
+			line = line.trim();
+			if (line != null && line != "")
 				switch (line.toLowerCase()) {
 					case ":help":
 						Sys.println("Available commands:");
@@ -113,6 +117,7 @@ class Main {
 						interp.printFn = s -> Sys.println(s);
 						varNames = [];
 						Sys.println("REPL state reset.");
+						cline = 0;
 						continue;
 					case ":exit":
 						return;
@@ -137,6 +142,7 @@ class Main {
 							var result = interp.run(stmts, varNames);
 							if (result != null)
 								Sys.println("=> " + interp.valToString(result));
+							cline += 1;
 						} catch (e:Error) {
 							Sys.println('Error: ${e.toString()}');
 						} catch (e:Dynamic) {
@@ -153,8 +159,8 @@ class Main {
 		var abstractSig = ~/\babstract\b.*\bfun\b/;
 
 		for (line in src.split("\n")) {
-			var t = StringTools.trim(line);
-			if (t == "" || StringTools.startsWith(t, "@"))
+			var t = line.trim();
+			if (t == "" || t.startsWith("@"))
 				continue;
 
 			// Block openers (excluding `fun` — handled separately below)
