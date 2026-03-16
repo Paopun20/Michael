@@ -1371,8 +1371,12 @@ class Parser {
 	 *  parameter names where keywords are valid (repeat, stop, type, in …). */
 	function expectFieldName():String
 		return switch peek().token {
-			case TIdent(s):   advance(); s;
-			case TKeyword(k): advance(); (k : String);
+			case TIdent(s):
+				advance();
+				s;
+			case TKeyword(k):
+				advance();
+				(k : String);
 			default: parseError('Expected field name, got ${tokenStr(peek().token)}');
 		}
 
