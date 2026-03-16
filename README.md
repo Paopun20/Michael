@@ -1,4 +1,4 @@
-# Michael - Modern InterpreTed Core for High-level And Embeddable Languages
+# Michael - Modern Interpreted Core for High-level And Embeddable Languages
 
 > A fast, simple, and readable programming language. — bytecode compilation with a stack-based VM.
 > Inspired Python + Zig + Nim + Rust + Lua + Etc

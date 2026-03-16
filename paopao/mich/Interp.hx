@@ -8,14 +8,14 @@ import paopao.mich.Error;
  * Internal signal type used by the interpreter to implement non-local control flow
  * such as return, break, continue, throw, and yield.
  */
-private class ZapSignal {}
+private class MichSignal {}
 
 /**
  * Return from a function with the given value.
  * Caught by the function-call logic in eval(ECall) to implement return semantics
  * across nested blocks.
  */
-private class ReturnSig extends ZapSignal {
+private class ReturnSig extends MichSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -26,21 +26,21 @@ private class ReturnSig extends ZapSignal {
 /**
  * Signal used to break out of a loop.
  */
-private class StopSig extends ZapSignal {
+private class StopSig extends MichSignal {
 	public function new() {}
 }
 
 /**
  * Signal used to continue to the next iteration of a loop.
  */
-private class ContinueSig extends ZapSignal {
+private class ContinueSig extends MichSignal {
 	public function new() {}
 }
 
 /**
  * Signal used to throw an exception.
  */
-private class ZapThrow extends ZapSignal {
+private class MichThrow extends MichSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -51,7 +51,7 @@ private class ZapThrow extends ZapSignal {
 /**
  * Signal used to suspend execution and yield a value (generator semantics).
  */
-private class YieldSig extends ZapSignal {
+private class YieldSig extends MichSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -75,8 +75,8 @@ class Env {
 	public function get(name:String):Dynamic {
 		if (vars.exists(name)) {
 			var v = vars.get(name);
-			if (Std.isOfType(v, ZapLazy)) {
-				v = (cast v : ZapLazy).force();
+			if (Std.isOfType(v, MichLazy)) {
+				v = (cast v : MichLazy).force();
 				vars.set(name, v);
 			}
 			return v;
@@ -108,7 +108,7 @@ class Env {
 		return new Env(this);
 }
 
-class ZapFunction {
+class MichFunction {
 	public var name:Null<String>;
 	public var args:Array<Argument>;
 	public var body:Null<Expr>; // null for natives
@@ -126,20 +126,20 @@ class ZapFunction {
 		this.isGenerator = isGenerator;
 	}
 
-	public static function ofNative(name:String, fn:Array<Dynamic>->Dynamic):ZapFunction {
-		var f = new ZapFunction(name, [], null, new Env(), [], false);
+	public static function ofNative(name:String, fn:Array<Dynamic>->Dynamic):MichFunction {
+		var f = new MichFunction(name, [], null, new Env(), [], false);
 		f.native = fn;
 		return f;
 	}
 }
 
 /** A class definition — holds field defaults, methods, and static members. */
-class ZapClass {
+class MichClass {
 	public var name:String;
-	public var parent:Null<ZapClass>;
+	public var parent:Null<MichClass>;
 	public var interfaces:Array<String>;
 	public var fieldDefaults:StringMap<Null<Dynamic>>; // declared instance fields
-	public var methods:StringMap<ZapFunction>;
+	public var methods:StringMap<MichFunction>;
 	public var staticFields:StringMap<Dynamic>;
 	public var isAbstract:Bool;
 	public var isInterface:Bool;
@@ -153,17 +153,17 @@ class ZapClass {
 	}
 }
 
-/** A live object instance. Also backs the IZapCustomBehaviour contract. */
-class ZapInstance implements IZapCustomBehaviour {
-	public var klass:ZapClass;
+/** A live object instance. Also backs the IMichCustomBehaviour contract. */
+class MichInstance implements IMichCustomBehaviour {
+	public var klass:MichClass;
 	public var fields:StringMap<Dynamic>;
 
-	public function new(klass:ZapClass) {
+	public function new(klass:MichClass) {
 		this.klass = klass;
 		this.fields = new StringMap();
 		// Seed with defaults from the entire inheritance chain (child wins).
 		var k = klass;
-		var chain:Array<ZapClass> = [];
+		var chain:Array<MichClass> = [];
 		while (k != null) {
 			chain.unshift(k);
 			k = k.parent;
@@ -180,9 +180,9 @@ class ZapInstance implements IZapCustomBehaviour {
 		var k = klass;
 		while (k != null) {
 			if (k.methods.exists(name)) {
-				var fn:ZapFunction = k.methods.get(name);
+				var fn:MichFunction = k.methods.get(name);
 				// Bind self so method bodies can reference it.
-				var bound = new ZapFunction(fn.name, fn.args, fn.body, fn.closure.child(), fn.varNames, fn.isGenerator);
+				var bound = new MichFunction(fn.name, fn.args, fn.body, fn.closure.child(), fn.varNames, fn.isGenerator);
 				bound.closure.define("self", this);
 				bound.native = fn.native;
 				return bound;
@@ -199,7 +199,7 @@ class ZapInstance implements IZapCustomBehaviour {
 }
 
 /** An enum type definition.  Color.Red returns the variant value. */
-class ZapEnumDef {
+class MichEnumDef {
 	public var name:String;
 	public var variants:StringMap<Dynamic>;
 
@@ -210,7 +210,7 @@ class ZapEnumDef {
 }
 
 /** An inclusive integer range   from..to */
-class ZapRange {
+class MichRange {
 	public var from:Int;
 	public var to:Int;
 
@@ -236,7 +236,7 @@ class ZapRange {
 }
 
 /** A deferred lazy value — evaluates exactly once on first access. */
-class ZapLazy {
+class MichLazy {
 	var thunk:Void->Dynamic;
 	var computed = false;
 	var cached:Dynamic;
@@ -319,7 +319,7 @@ class Interp {
 			case EVarDecl(name, _, valExpr, _, isLazy):
 				var v:Dynamic = switch [valExpr, isLazy] {
 					case [null, _]: null;
-					case [ve, true]: new ZapLazy(() -> eval(ve));
+					case [ve, true]: new MichLazy(() -> eval(ve));
 					case [ve, false]: eval(ve);
 				}
 				env.define(name, v);
@@ -384,7 +384,7 @@ class Interp {
 				buf.toString();
 
 			case EFunction(name, args, _, body, isLazy):
-				var fn = new ZapFunction(name, args, body, env, varNames, isLazy);
+				var fn = new MichFunction(name, args, body, env, varNames, isLazy);
 				if (name != null && !StringTools.startsWith(name, "~s~"))
 					env.setOrDefine(name, fn);
 				fn;
@@ -473,13 +473,13 @@ class Interp {
 			case EStop: throw new StopSig();
 			case EContinue: throw new ContinueSig();
 
-			case EThrow(inner): throw new ZapThrow(eval(inner));
+			case EThrow(inner): throw new MichThrow(eval(inner));
 
 			case ETry(body, catches, always):
 				var result:Dynamic = null;
 				try {
 					result = eval(body);
-				} catch (sig:ZapThrow) {
+				} catch (sig:MichThrow) {
 					var handled = false;
 					for (c in catches) {
 						if (c.type == null || typeOf(sig.v) == c.type) {
@@ -518,7 +518,7 @@ class Interp {
 				v != null ? v : eval(def);
 
 			case ERange(from, to):
-				new ZapRange(Std.int(eval(from)), Std.int(eval(to)));
+				new MichRange(Std.int(eval(from)), Std.int(eval(to)));
 
 			case EPipeline(lhs, rhs):
 				var v = eval(lhs);
@@ -539,7 +539,7 @@ class Interp {
 
 			case ENew(type, rawArgs):
 				var klass = env.get(type);
-				if (!Std.isOfType(klass, ZapClass))
+				if (!Std.isOfType(klass, MichClass))
 					interpError('$type is not a class', e.line);
 				instantiate(cast klass, [for (a in rawArgs) eval(a)], new StringMap());
 
@@ -568,15 +568,15 @@ class Interp {
 					var threw = false;
 					try {
 						eval(inner);
-					} catch (_:ZapThrow) {
+					} catch (_:MichThrow) {
 						threw = true;
 					}
 					if (!threw)
-						throw new ZapThrow("Expected an exception but none was thrown");
+						throw new MichThrow("Expected an exception but none was thrown");
 				} else {
 					var v = eval(inner);
 					if (!isTruthy(v))
-						throw new ZapThrow('Assertion failed: expected truthy, got ${valToString(v)}');
+						throw new MichThrow('Assertion failed: expected truthy, got ${valToString(v)}');
 				}
 				null;
 		}
@@ -624,14 +624,14 @@ class Interp {
 		var name = pipeIdx >= 0 ? nameAndParent.substring(0, pipeIdx) : nameAndParent;
 		var parentName = pipeIdx >= 0 ? nameAndParent.substring(pipeIdx + 1) : null;
 
-		var klass = new ZapClass(name);
+		var klass = new MichClass(name);
 		klass.isAbstract = StringTools.startsWith(tag, "abstract:");
 		klass.isInterface = StringTools.startsWith(tag, "interface:");
 
 		// Resolve parent
 		if (parentName != null) {
 			var p = try env.get(parentName) catch (_:Dynamic) null;
-			if (Std.isOfType(p, ZapClass))
+			if (Std.isOfType(p, MichClass))
 				klass.parent = cast p;
 		}
 
@@ -645,7 +645,7 @@ class Interp {
 				case EVarDecl(rawName, _, defExpr, _, isLazy):
 					var isStatic = StringTools.startsWith(rawName, "~s~");
 					var fname = isStatic ? rawName.substring(3) : rawName;
-					var dv:Dynamic = defExpr == null ? null : isLazy ? new ZapLazy(() -> eval(defExpr)) : eval(defExpr);
+					var dv:Dynamic = defExpr == null ? null : isLazy ? new MichLazy(() -> eval(defExpr)) : eval(defExpr);
 					if (isStatic)
 						klass.staticFields.set(fname, dv);
 					else
@@ -655,7 +655,7 @@ class Interp {
 				case EFunction(rawName, args, _, body, isLazy) if (rawName != null):
 					var isStatic = StringTools.startsWith(rawName, "~s~");
 					var mname = isStatic ? rawName.substring(3) : rawName;
-					var fn = new ZapFunction(mname, args, body, env, varNames, isLazy);
+					var fn = new MichFunction(mname, args, body, env, varNames, isLazy);
 					if (isStatic)
 						klass.staticFields.set(mname, fn);
 					else
@@ -671,7 +671,7 @@ class Interp {
 	// Enum definition
 	function defineEnum(tag:String, exprs:Array<Expr>):Dynamic {
 		var name = tag.substring("enum:".length);
-		var enumDef = new ZapEnumDef(name);
+		var enumDef = new MichEnumDef(name);
 
 		for (i in 1...exprs.length)
 			switch exprs[i].expr {
@@ -702,7 +702,7 @@ class Interp {
 				}
 		];
 
-		var ctor = ZapFunction.ofNative(name, args -> {
+		var ctor = MichFunction.ofNative(name, args -> {
 			var m = new StringMap<Dynamic>();
 			for (i => fname in fields)
 				m.set(fname, i < args.length ? args[i] : null);
@@ -746,8 +746,8 @@ class Interp {
 	}
 
 	function inCheck(val:Dynamic, container:Dynamic):Bool {
-		if (Std.isOfType(container, ZapRange))
-			return (cast container : ZapRange).contains(val);
+		if (Std.isOfType(container, MichRange))
+			return (cast container : MichRange).contains(val);
 		if (Std.isOfType(container, Array))
 			return (cast container : Array<Dynamic>).contains(val);
 		if (Std.isOfType(container, StringMap))
@@ -802,14 +802,14 @@ class Interp {
 		if (obj == null)
 			interpError('Cannot read field "$name" of none', line);
 
-		// IZapCustomBehaviour (ZapInstance implements this)
-		if (Std.isOfType(obj, IZapCustomBehaviour))
-			return (cast obj : IZapCustomBehaviour).zget(name);
+		// IMichCustomBehaviour (MichInstance implements this)
+		if (Std.isOfType(obj, IMichCustomBehaviour))
+			return (cast obj : IMichCustomBehaviour).zget(name);
 
-		// ZapInstance — but IZapCustomBehaviour already handles it above
-		// ZapClass — static member or enum-variant-style access
-		if (Std.isOfType(obj, ZapClass)) {
-			var klass:ZapClass = cast obj;
+		// MichInstance — but IMichCustomBehaviour already handles it above
+		// MichClass — static member or enum-variant-style access
+		if (Std.isOfType(obj, MichClass)) {
+			var klass:MichClass = cast obj;
 			if (klass.staticFields.exists(name))
 				return klass.staticFields.get(name);
 			if (klass.methods.exists(name))
@@ -817,9 +817,9 @@ class Interp {
 			interpError('No static member "$name" on class ${klass.name}', line);
 		}
 
-		// ZapEnumDef  — variant access:  Direction.North
-		if (Std.isOfType(obj, ZapEnumDef)) {
-			var ed:ZapEnumDef = cast obj;
+		// MichEnumDef  — variant access:  Direction.North
+		if (Std.isOfType(obj, MichEnumDef)) {
+			var ed:MichEnumDef = cast obj;
 			if (ed.variants.exists(name))
 				return ed.variants.get(name);
 			interpError('No variant "$name" in enum ${ed.name}', line);
@@ -847,13 +847,13 @@ class Interp {
 			return builtinMethod(obj, name, line);
 		}
 
-		// ZapRange
-		if (Std.isOfType(obj, ZapRange))
+		// MichRange
+		if (Std.isOfType(obj, MichRange))
 			switch name {
 				case "from":
-					return (cast obj : ZapRange).from;
+					return (cast obj : MichRange).from;
 				case "to":
-					return (cast obj : ZapRange).to;
+					return (cast obj : MichRange).to;
 				default:
 			}
 
@@ -868,12 +868,12 @@ class Interp {
 	function setField(obj:Dynamic, name:String, value:Dynamic, line:Int):Void {
 		if (obj == null)
 			interpError('Cannot set field "$name" of none', line);
-		if (Std.isOfType(obj, IZapCustomBehaviour)) {
-			(cast obj : IZapCustomBehaviour).zset(name, value);
+		if (Std.isOfType(obj, IMichCustomBehaviour)) {
+			(cast obj : IMichCustomBehaviour).zset(name, value);
 			return;
 		}
-		if (Std.isOfType(obj, ZapClass)) {
-			(cast obj : ZapClass).staticFields.set(name, value);
+		if (Std.isOfType(obj, MichClass)) {
+			(cast obj : MichClass).staticFields.set(name, value);
 			return;
 		}
 		if (Std.isOfType(obj, StringMap)) {
@@ -889,8 +889,8 @@ class Interp {
 			return (cast container : Array<Dynamic>)[Std.int(idx)];
 		if (Std.isOfType(container, StringMap))
 			return (cast container : StringMap<Dynamic>).get(valToString(idx));
-		if (Std.isOfType(container, ZapRange)) {
-			var r:ZapRange = cast container;
+		if (Std.isOfType(container, MichRange)) {
+			var r:MichRange = cast container;
 			var i = r.from + Std.int(idx);
 			return i <= r.to ? i : null;
 		}
@@ -903,8 +903,8 @@ class Interp {
 	}
 
 	// Method binding (closes over 'self')
-	function bindMethod(fn:ZapFunction, inst:ZapInstance):ZapFunction {
-		var bound = new ZapFunction(fn.name, fn.args, fn.body, fn.closure.child(), fn.varNames, fn.isGenerator);
+	function bindMethod(fn:MichFunction, inst:MichInstance):MichFunction {
+		var bound = new MichFunction(fn.name, fn.args, fn.body, fn.closure.child(), fn.varNames, fn.isGenerator);
 		bound.closure.define("self", inst);
 		bound.native = fn.native;
 		return bound;
@@ -914,11 +914,11 @@ class Interp {
 	function callValue(fn:Dynamic, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>, line:Int):Dynamic {
 		if (fn == null)
 			interpError("Cannot call none", line);
-		if (Std.isOfType(fn, ZapClass))
+		if (Std.isOfType(fn, MichClass))
 			return instantiate(cast fn, posArgs, namedArgs);
-		if (!Std.isOfType(fn, ZapFunction))
+		if (!Std.isOfType(fn, MichFunction))
 			interpError('${valToString(fn)} is not callable', line);
-		var f:ZapFunction = cast fn;
+		var f:MichFunction = cast fn;
 		if (f.native != null)
 			return f.native(posArgs);
 		if (f.isGenerator)
@@ -926,7 +926,7 @@ class Interp {
 		return callFunction(f, posArgs, namedArgs);
 	}
 
-	function callFunction(f:ZapFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
+	function callFunction(f:MichFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
 		var callEnv = f.closure.child();
 		bindArgs(f, posArgs, namedArgs, callEnv);
 		var saved = env;
@@ -948,7 +948,7 @@ class Interp {
 		return result;
 	}
 
-	function bindArgs(f:ZapFunction, pos:Array<Dynamic>, named:StringMap<Dynamic>, target:Env):Void {
+	function bindArgs(f:MichFunction, pos:Array<Dynamic>, named:StringMap<Dynamic>, target:Env):Void {
 		for (i => arg in f.args) {
 			var argName = f.varNames.length > 0 ? f.varNames[arg.name] : Std.string(arg.name);
 			if (argName == null)
@@ -960,8 +960,8 @@ class Interp {
 	}
 
 	// Class instantiation
-	function instantiate(klass:ZapClass, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
-		var inst = new ZapInstance(klass);
+	function instantiate(klass:MichClass, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Dynamic {
+		var inst = new MichInstance(klass);
 
 		// Find and call init, walking up the chain
 		var k = klass;
@@ -971,7 +971,7 @@ class Interp {
 				// Provide super() as a callable that delegates to the parent's init
 				if (klass.parent != null) {
 					var parentClass = klass.parent;
-					initFn.closure.define("super", ZapFunction.ofNative("super", args -> {
+					initFn.closure.define("super", MichFunction.ofNative("super", args -> {
 						var pk = parentClass;
 						while (pk != null) {
 							if (pk.methods.exists("init")) {
@@ -996,7 +996,7 @@ class Interp {
 	// Haxe has no coroutines, so we run the body to completion while routing
 	// all yield statements into a collector array.  The result is a plain list
 	// whose iterator the caller can use in  every x in gen()  etc.
-	function runGenerator(f:ZapFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Array<Dynamic> {
+	function runGenerator(f:MichFunction, posArgs:Array<Dynamic>, namedArgs:StringMap<Dynamic>):Array<Dynamic> {
 		var results:Array<Dynamic> = [];
 		var prevCollector = yieldCollector;
 		yieldCollector = results;
@@ -1060,8 +1060,8 @@ class Interp {
 
 			// Enum-variant match  Direction.North
 			case EField(enumExpr, variantName): var ed = eval(enumExpr); Std.isOfType(ed,
-					ZapEnumDef) && (cast ed : ZapEnumDef).variants.exists(variantName)
-					&& valEq(subject, (cast ed : ZapEnumDef).variants.get(variantName));
+					MichEnumDef) && (cast ed : MichEnumDef).variants.exists(variantName)
+					&& valEq(subject, (cast ed : MichEnumDef).variants.get(variantName));
 
 			// Type-name pattern  int  text  float  bool  …
 			case EIdent(typeName) if (isBuiltinType(typeName)):
@@ -1123,16 +1123,16 @@ class Interp {
 			return "list";
 		if (Std.isOfType(v, StringMap))
 			return "map";
-		if (Std.isOfType(v, ZapFunction))
+		if (Std.isOfType(v, MichFunction))
 			return "fun";
-		if (Std.isOfType(v, ZapClass))
+		if (Std.isOfType(v, MichClass))
 			return "class";
-		if (Std.isOfType(v, ZapEnumDef))
+		if (Std.isOfType(v, MichEnumDef))
 			return "enum";
-		if (Std.isOfType(v, ZapRange))
+		if (Std.isOfType(v, MichRange))
 			return "range";
-		if (Std.isOfType(v, ZapInstance))
-			return (cast v : ZapInstance).klass.name;
+		if (Std.isOfType(v, MichInstance))
+			return (cast v : MichInstance).klass.name;
 		return "any";
 	}
 
@@ -1143,8 +1143,8 @@ class Interp {
 	function toIterable(v:Dynamic, line:Int):Array<Dynamic> {
 		if (Std.isOfType(v, Array))
 			return cast v;
-		if (Std.isOfType(v, ZapRange))
-			return (cast v : ZapRange).toArray();
+		if (Std.isOfType(v, MichRange))
+			return (cast v : MichRange).toArray();
 		if (Std.isOfType(v, StringMap))
 			return [for (k in (cast v : StringMap<Dynamic>).keys()) k];
 		if (Std.isOfType(v, String))
@@ -1158,16 +1158,16 @@ class Interp {
 		if (Std.isOfType(obj, String)) {
 			var s:String = cast obj;
 			return switch name {
-				case "upper": ZapFunction.ofNative("upper", _ -> s.toUpperCase());
-				case "lower": ZapFunction.ofNative("lower", _ -> s.toLowerCase());
-				case "trim": ZapFunction.ofNative("trim", _ -> StringTools.trim(s));
-				case "split": ZapFunction.ofNative("split", a -> (s.split(a[0]) : Array<Dynamic>));
-				case "contains": ZapFunction.ofNative("contains", a -> StringTools.contains(s, a[0]));
-				case "startsWith": ZapFunction.ofNative("startsWith", a -> StringTools.startsWith(s, a[0]));
-				case "endsWith": ZapFunction.ofNative("endsWith", a -> StringTools.endsWith(s, a[0]));
-				case "replace": ZapFunction.ofNative("replace", a -> StringTools.replace(s, a[0], a[1]));
-				case "indexOf": ZapFunction.ofNative("indexOf", a -> s.indexOf(a[0]));
-				case "repeat": ZapFunction.ofNative("repeat", a -> {
+				case "upper": MichFunction.ofNative("upper", _ -> s.toUpperCase());
+				case "lower": MichFunction.ofNative("lower", _ -> s.toLowerCase());
+				case "trim": MichFunction.ofNative("trim", _ -> StringTools.trim(s));
+				case "split": MichFunction.ofNative("split", a -> (s.split(a[0]) : Array<Dynamic>));
+				case "contains": MichFunction.ofNative("contains", a -> StringTools.contains(s, a[0]));
+				case "startsWith": MichFunction.ofNative("startsWith", a -> StringTools.startsWith(s, a[0]));
+				case "endsWith": MichFunction.ofNative("endsWith", a -> StringTools.endsWith(s, a[0]));
+				case "replace": MichFunction.ofNative("replace", a -> StringTools.replace(s, a[0], a[1]));
+				case "indexOf": MichFunction.ofNative("indexOf", a -> s.indexOf(a[0]));
+				case "repeat": MichFunction.ofNative("repeat", a -> {
 						var buf = new StringBuf();
 						for (_ in 0...Std.int(a[0]))
 							buf.add(s);
@@ -1181,33 +1181,33 @@ class Interp {
 		if (Std.isOfType(obj, Array)) {
 			var a:Array<Dynamic> = cast obj;
 			return switch name {
-				case "push": ZapFunction.ofNative("push", x -> {
+				case "push": MichFunction.ofNative("push", x -> {
 						a.push(x[0]);
 						null;
 					});
-				case "pop": ZapFunction.ofNative("pop", _ -> a.pop());
-				case "first": ZapFunction.ofNative("first", _ -> a.length > 0 ? a[0] : null);
-				case "last": ZapFunction.ofNative("last", _ -> a.length > 0 ? a[a.length - 1] : null);
-				case "reverse": ZapFunction.ofNative("reverse", _ -> {
+				case "pop": MichFunction.ofNative("pop", _ -> a.pop());
+				case "first": MichFunction.ofNative("first", _ -> a.length > 0 ? a[0] : null);
+				case "last": MichFunction.ofNative("last", _ -> a.length > 0 ? a[a.length - 1] : null);
+				case "reverse": MichFunction.ofNative("reverse", _ -> {
 						var r = a.copy();
 						r.reverse();
 						r;
 					});
-				case "contains": ZapFunction.ofNative("contains", x -> a.contains(x[0]));
-				case "indexOf": ZapFunction.ofNative("indexOf", x -> a.indexOf(x[0]));
-				case "join": ZapFunction.ofNative("join", x -> a.map(valToString).join(x.length > 0 ? x[0] : ""));
-				case "slice": ZapFunction.ofNative("slice", x -> (a.slice(Std.int(x[0]), x.length > 1 ? Std.int(x[1]) : a.length) : Array<Dynamic>));
-				case "sort": ZapFunction.ofNative("sort", x -> {
+				case "contains": MichFunction.ofNative("contains", x -> a.contains(x[0]));
+				case "indexOf": MichFunction.ofNative("indexOf", x -> a.indexOf(x[0]));
+				case "join": MichFunction.ofNative("join", x -> a.map(valToString).join(x.length > 0 ? x[0] : ""));
+				case "slice": MichFunction.ofNative("slice", x -> (a.slice(Std.int(x[0]), x.length > 1 ? Std.int(x[1]) : a.length) : Array<Dynamic>));
+				case "sort": MichFunction.ofNative("sort", x -> {
 						var r = a.copy();
-						if (x.length > 0 && Std.isOfType(x[0], ZapFunction))
+						if (x.length > 0 && Std.isOfType(x[0], MichFunction))
 							r.sort((p, q) -> Std.int((callValue(x[0], [p, q], new StringMap(), 0) : Float)));
 						else
 							r.sort((p, q) -> valToString(p) < valToString(q) ? -1 : valToString(p) > valToString(q) ? 1 : 0);
 						r;
 					});
-				case "map": ZapFunction.ofNative("map", x -> (a.map(i -> callValue(x[0], [i], new StringMap(), 0)) : Array<Dynamic>));
-				case "filter": ZapFunction.ofNative("filter", x -> (a.filter(i -> isTruthy(callValue(x[0], [i], new StringMap(), 0))) : Array<Dynamic>));
-				case "reduce": ZapFunction.ofNative("reduce", x -> {
+				case "map": MichFunction.ofNative("map", x -> (a.map(i -> callValue(x[0], [i], new StringMap(), 0)) : Array<Dynamic>));
+				case "filter": MichFunction.ofNative("filter", x -> (a.filter(i -> isTruthy(callValue(x[0], [i], new StringMap(), 0))) : Array<Dynamic>));
+				case "reduce": MichFunction.ofNative("reduce", x -> {
 						if (a.length == 0)
 							return null;
 						var acc = a[0];
@@ -1223,10 +1223,10 @@ class Interp {
 		if (Std.isOfType(obj, StringMap)) {
 			var m:StringMap<Dynamic> = cast obj;
 			return switch name {
-				case "keys": ZapFunction.ofNative("keys", _ -> ([for (k in m.keys()) k] : Array<Dynamic>));
-				case "values": ZapFunction.ofNative("values", _ -> ([for (v in m) v] : Array<Dynamic>));
-				case "exists": ZapFunction.ofNative("exists", a -> m.exists(a[0]));
-				case "remove": ZapFunction.ofNative("remove", a -> {
+				case "keys": MichFunction.ofNative("keys", _ -> ([for (k in m.keys()) k] : Array<Dynamic>));
+				case "values": MichFunction.ofNative("values", _ -> ([for (v in m) v] : Array<Dynamic>));
+				case "exists": MichFunction.ofNative("exists", a -> m.exists(a[0]));
+				case "remove": MichFunction.ofNative("remove", a -> {
 						m.remove(a[0]);
 						null;
 					});
@@ -1241,7 +1241,7 @@ class Interp {
 
 	// Module loading
 	function loadModule(path:String, mode:EImportMode, isLazy:Bool):Void {
-		var modVal:Dynamic = isLazy ? new ZapLazy(() -> resolveModule(path)) : resolveModule(path);
+		var modVal:Dynamic = isLazy ? new MichLazy(() -> resolveModule(path)) : resolveModule(path);
 
 		switch mode {
 			case INormal:
@@ -1250,7 +1250,7 @@ class Interp {
 			case IAlias(alias):
 				env.setOrDefine(alias, modVal);
 			case IPartial(items):
-				var mod:Dynamic = Std.isOfType(modVal, ZapLazy) ? (cast modVal : ZapLazy).force() : modVal;
+				var mod:Dynamic = Std.isOfType(modVal, MichLazy) ? (cast modVal : MichLazy).force() : modVal;
 				for (item in items)
 					env.setOrDefine(item, getField(mod, item, 0));
 		}
@@ -1274,15 +1274,15 @@ class Interp {
 
 	function mathModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("sqrt", ZapFunction.ofNative("sqrt", a -> Math.sqrt(a[0])));
-		m.set("pow", ZapFunction.ofNative("pow", a -> Math.pow(a[0], a[1])));
-		m.set("abs", ZapFunction.ofNative("abs", a -> Math.abs(a[0])));
-		m.set("floor", ZapFunction.ofNative("floor", a -> Math.floor(a[0])));
-		m.set("ceil", ZapFunction.ofNative("ceil", a -> Math.ceil(a[0])));
-		m.set("round", ZapFunction.ofNative("round", a -> Math.round(a[0])));
-		m.set("min", ZapFunction.ofNative("min", a -> Math.min(a[0], a[1])));
-		m.set("max", ZapFunction.ofNative("max", a -> Math.max(a[0], a[1])));
-		m.set("log", ZapFunction.ofNative("log", a -> Math.log(a[0])));
+		m.set("sqrt", MichFunction.ofNative("sqrt", a -> Math.sqrt(a[0])));
+		m.set("pow", MichFunction.ofNative("pow", a -> Math.pow(a[0], a[1])));
+		m.set("abs", MichFunction.ofNative("abs", a -> Math.abs(a[0])));
+		m.set("floor", MichFunction.ofNative("floor", a -> Math.floor(a[0])));
+		m.set("ceil", MichFunction.ofNative("ceil", a -> Math.ceil(a[0])));
+		m.set("round", MichFunction.ofNative("round", a -> Math.round(a[0])));
+		m.set("min", MichFunction.ofNative("min", a -> Math.min(a[0], a[1])));
+		m.set("max", MichFunction.ofNative("max", a -> Math.max(a[0], a[1])));
+		m.set("log", MichFunction.ofNative("log", a -> Math.log(a[0])));
 		m.set("pi", Math.PI);
 		m.set("e", Math.exp(1.0));
 		return m;
@@ -1290,28 +1290,28 @@ class Interp {
 
 	function textModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("split", ZapFunction.ofNative("split", a -> ((a[0] : String).split(a[1]) : Array<Dynamic>)));
-		m.set("join", ZapFunction.ofNative("join", a -> (a[0] : Array<Dynamic>).map(valToString).join(a[1])));
-		m.set("trim", ZapFunction.ofNative("trim", a -> StringTools.trim(a[0])));
-		m.set("upper", ZapFunction.ofNative("upper", a -> (a[0] : String).toUpperCase()));
-		m.set("lower", ZapFunction.ofNative("lower", a -> (a[0] : String).toLowerCase()));
-		m.set("replace", ZapFunction.ofNative("replace", a -> StringTools.replace(a[0], a[1], a[2])));
-		m.set("contains", ZapFunction.ofNative("contains", a -> StringTools.contains(a[0], a[1])));
-		m.set("startsWith", ZapFunction.ofNative("startsWith", a -> StringTools.startsWith(a[0], a[1])));
-		m.set("endsWith", ZapFunction.ofNative("endsWith", a -> StringTools.endsWith(a[0], a[1])));
+		m.set("split", MichFunction.ofNative("split", a -> ((a[0] : String).split(a[1]) : Array<Dynamic>)));
+		m.set("join", MichFunction.ofNative("join", a -> (a[0] : Array<Dynamic>).map(valToString).join(a[1])));
+		m.set("trim", MichFunction.ofNative("trim", a -> StringTools.trim(a[0])));
+		m.set("upper", MichFunction.ofNative("upper", a -> (a[0] : String).toUpperCase()));
+		m.set("lower", MichFunction.ofNative("lower", a -> (a[0] : String).toLowerCase()));
+		m.set("replace", MichFunction.ofNative("replace", a -> StringTools.replace(a[0], a[1], a[2])));
+		m.set("contains", MichFunction.ofNative("contains", a -> StringTools.contains(a[0], a[1])));
+		m.set("startsWith", MichFunction.ofNative("startsWith", a -> StringTools.startsWith(a[0], a[1])));
+		m.set("endsWith", MichFunction.ofNative("endsWith", a -> StringTools.endsWith(a[0], a[1])));
 		return m;
 	}
 
 	function listModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("sort", ZapFunction.ofNative("sort", a -> {
+		m.set("sort", MichFunction.ofNative("sort", a -> {
 			var r:Array<Dynamic> = (cast a[0] : Array<Dynamic>).copy();
 			r.sort((p, q) -> valToString(p) < valToString(q) ? -1 : 1);
 			r;
 		}));
-		m.set("filter", ZapFunction.ofNative("filter", a -> (a[0] : Array<Dynamic>).filter(x -> isTruthy(callValue(a[1], [x], new StringMap(), 0)))));
-		m.set("map", ZapFunction.ofNative("map", a -> ((a[0] : Array<Dynamic>).map(x -> callValue(a[1], [x], new StringMap(), 0)) : Array<Dynamic>)));
-		m.set("reduce", ZapFunction.ofNative("reduce", a -> {
+		m.set("filter", MichFunction.ofNative("filter", a -> (a[0] : Array<Dynamic>).filter(x -> isTruthy(callValue(a[1], [x], new StringMap(), 0)))));
+		m.set("map", MichFunction.ofNative("map", a -> ((a[0] : Array<Dynamic>).map(x -> callValue(a[1], [x], new StringMap(), 0)) : Array<Dynamic>)));
+		m.set("reduce", MichFunction.ofNative("reduce", a -> {
 			var arr:Array<Dynamic> = a[0];
 			if (arr.length == 0)
 				return null;
@@ -1325,13 +1325,13 @@ class Interp {
 
 	function randomModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("int", ZapFunction.ofNative("int", a -> Std.int(Math.random() * ((a[1] : Int) - (a[0] : Int))) + (a[0] : Int)));
-		m.set("float", ZapFunction.ofNative("float", _ -> Math.random()));
-		m.set("pick", ZapFunction.ofNative("pick", a -> {
+		m.set("int", MichFunction.ofNative("int", a -> Std.int(Math.random() * ((a[1] : Int) - (a[0] : Int))) + (a[0] : Int)));
+		m.set("float", MichFunction.ofNative("float", _ -> Math.random()));
+		m.set("pick", MichFunction.ofNative("pick", a -> {
 			var arr:Array<Dynamic> = a[0];
 			arr[Std.int(Math.random() * arr.length)];
 		}));
-		m.set("shuffle", ZapFunction.ofNative("shuffle", a -> {
+		m.set("shuffle", MichFunction.ofNative("shuffle", a -> {
 			var arr:Array<Dynamic> = (cast a[0] : Array<Dynamic>).copy();
 			var n = arr.length;
 			while (n > 1) {
@@ -1348,27 +1348,27 @@ class Interp {
 
 	function jsonModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("parse", ZapFunction.ofNative("parse", a -> haxe.Json.parse(a[0])));
-		m.set("stringify", ZapFunction.ofNative("stringify", a -> haxe.Json.stringify(a[0])));
+		m.set("parse", MichFunction.ofNative("parse", a -> haxe.Json.parse(a[0])));
+		m.set("stringify", MichFunction.ofNative("stringify", a -> haxe.Json.stringify(a[0])));
 		return m;
 	}
 
 	function timeModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("now", ZapFunction.ofNative("now", _ -> Date.now().getTime()));
-		m.set("sleep", ZapFunction.ofNative("sleep", a -> {
+		m.set("now", MichFunction.ofNative("now", _ -> Date.now().getTime()));
+		m.set("sleep", MichFunction.ofNative("sleep", a -> {
 			Sys.sleep(a[0]);
 			null;
 		}));
-		m.set("format", ZapFunction.ofNative("format", a -> DateTools.format(Date.fromTime(a[0]), a[1])));
+		m.set("format", MichFunction.ofNative("format", a -> DateTools.format(Date.fromTime(a[0]), a[1])));
 		return m;
 	}
 
 	function osModule():Dynamic {
 		var m = new StringMap<Dynamic>();
 		m.set("args", (Sys.args() : Array<Dynamic>));
-		m.set("env", ZapFunction.ofNative("env", a -> Sys.getEnv(a[0])));
-		m.set("exit", ZapFunction.ofNative("exit", a -> {
+		m.set("env", MichFunction.ofNative("env", a -> Sys.getEnv(a[0])));
+		m.set("exit", MichFunction.ofNative("exit", a -> {
 			Sys.exit(a.length > 0 ? Std.int(a[0]) : 0);
 			null;
 		}));
@@ -1377,35 +1377,35 @@ class Interp {
 
 	function assertModule():Dynamic {
 		var m = new StringMap<Dynamic>();
-		m.set("equal", ZapFunction.ofNative("equal", a -> {
+		m.set("equal", MichFunction.ofNative("equal", a -> {
 			if (!valEq(a[0], a[1]))
-				throw new ZapThrow('Expected ${valToString(a[0])} == ${valToString(a[1])}');
+				throw new MichThrow('Expected ${valToString(a[0])} == ${valToString(a[1])}');
 			null;
 		}));
-		m.set("notEqual", ZapFunction.ofNative("notEqual", a -> {
+		m.set("notEqual", MichFunction.ofNative("notEqual", a -> {
 			if (valEq(a[0], a[1]))
-				throw new ZapThrow('Expected ${valToString(a[0])} != ${valToString(a[1])}');
+				throw new MichThrow('Expected ${valToString(a[0])} != ${valToString(a[1])}');
 			null;
 		}));
-		m.set("true", ZapFunction.ofNative("true", a -> {
+		m.set("true", MichFunction.ofNative("true", a -> {
 			if (!isTruthy(a[0]))
-				throw new ZapThrow('Expected truthy, got ${valToString(a[0])}');
+				throw new MichThrow('Expected truthy, got ${valToString(a[0])}');
 			null;
 		}));
-		m.set("false", ZapFunction.ofNative("false", a -> {
+		m.set("false", MichFunction.ofNative("false", a -> {
 			if (isTruthy(a[0]))
-				throw new ZapThrow('Expected falsy, got ${valToString(a[0])}');
+				throw new MichThrow('Expected falsy, got ${valToString(a[0])}');
 			null;
 		}));
-		m.set("throws", ZapFunction.ofNative("throws", a -> {
+		m.set("throws", MichFunction.ofNative("throws", a -> {
 			var threw = false;
 			try
 				callValue(a[0], [], new StringMap(), 0)
-			catch (_:ZapThrow) {
+			catch (_:MichThrow) {
 				threw = true;
 			}
 			if (!threw)
-				throw new ZapThrow("Expected an exception");
+				throw new MichThrow("Expected an exception");
 			null;
 		}));
 		return m;
@@ -1414,18 +1414,18 @@ class Interp {
 	// Global stdlib init
 	function loadStdlib():Void {
 		// say is also available as a global function (in addition to the keyword)
-		globals.define("say", ZapFunction.ofNative("say", a -> {
+		globals.define("say", MichFunction.ofNative("say", a -> {
 			printFn(a.length > 0 ? valToString(a[0]) : "");
 			null;
 		}));
 		// Type conversion
-		globals.define("int", ZapFunction.ofNative("int", a -> Std.int(a[0])));
-		globals.define("float", ZapFunction.ofNative("float", a -> (a[0] : Float)));
-		globals.define("text", ZapFunction.ofNative("text", a -> valToString(a[0])));
-		globals.define("bool", ZapFunction.ofNative("bool", a -> isTruthy(a[0])));
+		globals.define("int", MichFunction.ofNative("int", a -> Std.int(a[0])));
+		globals.define("float", MichFunction.ofNative("float", a -> (a[0] : Float)));
+		globals.define("text", MichFunction.ofNative("text", a -> valToString(a[0])));
+		globals.define("bool", MichFunction.ofNative("bool", a -> isTruthy(a[0])));
 		// Introspection
-		globals.define("type", ZapFunction.ofNative("type", a -> typeOf(a[0])));
-		globals.define("len", ZapFunction.ofNative("len", a -> switch typeOf(a[0]) {
+		globals.define("type", MichFunction.ofNative("type", a -> typeOf(a[0])));
+		globals.define("len", MichFunction.ofNative("len", a -> switch typeOf(a[0]) {
 			case "text": (a[0] : String).length;
 			case "list": (cast a[0] : Array<Dynamic>).length;
 			case "map": {var n = 0; for (_ in (cast a[0] : StringMap<Dynamic>)) n++; n;}
@@ -1440,7 +1440,7 @@ class Interp {
 		var err:Null<String> = null;
 		try {
 			eval(body);
-		} catch (sig:ZapThrow) {
+		} catch (sig:MichThrow) {
 			err = valToString(sig.v);
 		} catch (e:Error) {
 			err = e.toString();
@@ -1495,25 +1495,22 @@ class Interp {
 	public function valToString(v:Dynamic):String {
 		if (v == null)
 			return "none";
-		if (v == true)
-			return "true";
-		if (v == false)
-			return "false";
-		if (Std.isOfType(v, ZapFunction)) {
-			var f:ZapFunction = cast v;
+		if (Std.isOfType(v, Bool))
+			return (v : Bool) ? "true" : "false";
+		if (Std.isOfType(v, MichFunction)) {
+			var f:MichFunction = cast v;
 			return f.name != null ? '<fun ${f.name}>' : '<fun>';
 		}
-		if (Std.isOfType(v, ZapClass))
-			return '<class ${(cast v : ZapClass).name}>';
-		if (Std.isOfType(v, ZapEnumDef))
-			return '<enum ${(cast v : ZapEnumDef).name}>';
-		if (Std.isOfType(v, ZapRange)) {
-			var r:ZapRange = cast v;
+		if (Std.isOfType(v, MichClass))
+			return '<class ${(cast v : MichClass).name}>';
+		if (Std.isOfType(v, MichEnumDef))
+			return '<enum ${(cast v : MichEnumDef).name}>';
+		if (Std.isOfType(v, MichRange)) {
+			var r:MichRange = cast v;
 			return '${r.from}..${r.to}';
 		}
-		if (Std.isOfType(v, ZapInstance)) {
-			var inst:ZapInstance = cast v;
-			// Call toString() if the class defines one
+		if (Std.isOfType(v, MichInstance)) {
+			var inst:MichInstance = cast v;
 			var k = inst.klass;
 			while (k != null) {
 				if (k.methods.exists("toString")) {
@@ -1521,7 +1518,6 @@ class Interp {
 				}
 				k = k.parent;
 			}
-			// Otherwise serialize visible fields
 			var pairs = [for (k => fv in inst.fields) '$k: ${valToString(fv)}'];
 			return '${inst.klass.name}{ ${pairs.join(", ")} }';
 		}

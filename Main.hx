@@ -32,7 +32,7 @@ class Main {
 			return;
 		}
 
-		if (StringTools.endsWith(fileArg, ".zap") || StringTools.endsWith(fileArg, ".zep")) {
+		if (StringTools.endsWith(fileArg, ".mich") || StringTools.endsWith(fileArg, ".mich")) {
 			runFile(fileArg, testMode);
 		} else {
 			Sys.stderr().writeString('Unknown command "$fileArg"\n');
@@ -45,7 +45,7 @@ class Main {
 	// File runner
 	static function runFile(path:String, testMode:Bool):Void {
 		if (!sys.FileSystem.exists(path)) {
-			Sys.stderr().writeString('zap: file not found: $path\n');
+			Sys.stderr().writeString('michael: file not found: $path\n');
 			Sys.exit(1);
 		}
 
