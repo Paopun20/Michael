@@ -3,7 +3,6 @@ package paopao.mich.michLib;
 import haxe.Json;
 
 class MichJson {
-
 	public static function parse(s:String):Dynamic
 		return Json.parse(s);
 
@@ -21,5 +20,4 @@ class MichJson {
 			return false;
 		}
 	}
-
 }

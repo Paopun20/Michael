@@ -1,7 +1,6 @@
 package paopao.mich.michLib;
 
 class MichTime {
-
 	public static function now():Float
 		return Date.now().getTime();
 
@@ -30,5 +29,4 @@ class MichTime {
 		Sys.sleep(ms / 1000);
 		return true;
 	}
-
 }

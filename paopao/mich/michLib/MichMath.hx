@@ -1,8 +1,8 @@
 package paopao.mich.michLib;
 
 class MichMath {
-    public static var pi:Float = Math.PI;
-    public static var e:Float = Math.exp(1);
+	public static var pi:Float = Math.PI;
+	public static var e:Float = Math.exp(1);
 
 	public static function abs(x:Float):Float
 		return Std.int(x) < 0 ? -x : x;
@@ -19,8 +19,8 @@ class MichMath {
 	public static function sqrt(x:Float):Float
 		return Math.sqrt(x);
 
-	public static function pow(a:Float,b:Float):Float
-		return Math.pow(a,b);
+	public static function pow(a:Float, b:Float):Float
+		return Math.pow(a, b);
 
 	public static function sin(x:Float):Float
 		return Math.sin(x);
@@ -37,13 +37,12 @@ class MichMath {
 	public static function exp(x:Float):Float
 		return Math.exp(x);
 
-	public static function min(a:Float,b:Float):Float
+	public static function min(a:Float, b:Float):Float
 		return a < b ? a : b;
 
-	public static function max(a:Float,b:Float):Float
+	public static function max(a:Float, b:Float):Float
 		return a > b ? a : b;
 
 	public static function random():Float
 		return Math.random();
-
 }

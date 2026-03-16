@@ -4,7 +4,6 @@ import sys.io.File;
 import sys.FileSystem;
 
 class MichFile {
-
 	public static function read(path:String):String {
 		return File.getContent(path);
 	}
@@ -30,5 +29,4 @@ class MichFile {
 			FileSystem.deleteFile(path);
 		return null;
 	}
-
 }
