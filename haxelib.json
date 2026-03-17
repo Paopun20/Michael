@@ -1,0 +1,22 @@
+{
+  "name": "michael",
+  "url": "https://github.com/Paopun20/Michael.hx",
+  "license": "MIT",
+  "tags": [
+    "interpreter",
+    "scripting",
+    "language",
+    "embeddable",
+    "high-level",
+    "modern"
+  ],
+  "description": "Michael is Modern Interpreted High-level Embeddable Languages.",
+  "version": "0.1.0",
+  "releasenote": "Initial release",
+  "contributors": ["paopaodev"],
+  "dependencies": {
+    "prismcli": ""
+  },
+  "classPath": "",
+  "main": "paopao.mich.Main"
+}

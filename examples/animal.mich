@@ -1,0 +1,46 @@
+class Animal
+  name: text
+
+  init(name: text)
+    self.name = name
+  end
+
+  fun speak() -> none
+    say "{self.name} makes a sound"
+  end
+end
+
+class Cat from Animal
+  init(name: text)
+    super(name)
+  end
+
+  fun speak() -> none
+    say "{self.name} meows!"
+  end
+end
+
+interface Flyable
+  fun fly() -> none
+  fun land() -> none
+end
+
+class Bird from Animal is Flyable
+  init(name: text)
+    super(name)
+  end
+
+  fun fly() -> none
+    say "{self.name} is flying!"
+  end
+
+  fun land() -> none
+    say "{self.name} landed!"
+  end
+end
+
+Cat("your cat").speak()
+bird = Bird("Somewhere bird")
+bird.fly()
+bird.speak()
+bird.land()

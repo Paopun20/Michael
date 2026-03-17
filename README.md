@@ -1,4 +1,4 @@
-# Michael - Modern Interpreted Core for High-level And Embeddable Languages
+# Michael - Modern Interpreted Code for High-level And Embeddable Languages
 
 > A fast, simple, and readable programming language. — bytecode compilation with a stack-based VM.
 > Inspired Python + Zig + Nim + Rust + Lua + Etc
@@ -667,7 +667,7 @@ say "Next year: {age + 1}"
 @ Multiline strings
 msg = """
 Hello World
-This is Zap
+This is Michael
 """
 
 @ Pipeline operator
@@ -753,7 +753,7 @@ end
 Run tests with:
 
 ```text
-Zap --test main.zap
+None
 ```
 
 ---

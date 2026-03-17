@@ -31,9 +31,9 @@ test "string literal"
   expect s == "hello"
 end
 
-test "string interpolation"
-  name = "Zap"
-  expect "Hello {name}!" == "Hello Zap!"
+test "string interpolation" @ need fix
+  name = "Mich"
+  expect "Hello {name}!" == "Hello Mich!"
 end
 
 test "multiline string"
@@ -823,6 +823,7 @@ end
 
 test "math pow"
   use math { pow }
+  say pow(2.0, 10.0)
   expect pow(2.0, 10.0) == 1024.0
 end
 

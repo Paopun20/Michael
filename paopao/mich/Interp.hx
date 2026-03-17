@@ -8,19 +8,20 @@ import paopao.mich.michLib.*;
 
 using StringTools;
 using Lambda;
+using Reflect;
 
 /**
  * Internal signal type used by the interpreter to implement non-local control flow
  * such as return, break, continue, throw, and yield.
  */
-private class MichSignal {}
+private class MichBaseSignal {}
 
 /**
  * Return from a function with the given value.
  * Caught by the function-call logic in eval(ECall) to implement return semantics
  * across nested blocks.
  */
-class ReturnSig extends MichSignal {
+private class ReturnSignal extends MichBaseSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -31,21 +32,21 @@ class ReturnSig extends MichSignal {
 /**
  * Signal used to break out of a loop.
  */
-class StopSig extends MichSignal {
+private class StopSignal extends MichBaseSignal {
 	public function new() {}
 }
 
 /**
  * Signal used to continue to the next iteration of a loop.
  */
-class ContinueSig extends MichSignal {
+private class ContinueSignal extends MichBaseSignal {
 	public function new() {}
 }
 
 /**
  * Signal used to throw an exception.
  */
-class MichThrow extends MichSignal {
+private class ThrowSignal extends MichBaseSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -56,7 +57,7 @@ class MichThrow extends MichSignal {
 /**
  * Signal used to suspend execution and yield a value (generator semantics).
  */
-class YieldSig extends MichSignal {
+private class YieldSignal extends MichBaseSignal {
 	public var v:Dynamic;
 
 	public function new(v:Dynamic) {
@@ -411,14 +412,14 @@ class Interp {
 			case ENamedArg(_, _): null; // only consumed inside ECall
 
 			case EReturn(inner):
-				throw new ReturnSig(inner == null ? null : eval(inner));
+				throw new ReturnSignal(inner == null ? null : eval(inner));
 
 			case EYield(inner):
 				var v = eval(inner);
 				if (yieldCollector != null) {
 					yieldCollector.push(v);
 					null;
-				} else throw new YieldSig(v);
+				} else throw new YieldSignal(v);
 
 			case EBlock(exprs): evalBlock(exprs);
 
@@ -453,7 +454,7 @@ class Interp {
 						env = child;
 						try {
 							eval(body);
-						} catch (_:ContinueSig) {}
+						} catch (_:ContinueSignal) {}
 						env = saved;
 					}
 				});
@@ -469,22 +470,22 @@ class Interp {
 						env = child;
 						try {
 							eval(body);
-						} catch (_:ContinueSig) {}
+						} catch (_:ContinueSignal) {}
 						env = saved;
 					}
 				});
 				null;
 
-			case EStop: throw new StopSig();
-			case EContinue: throw new ContinueSig();
+			case EStop: throw new StopSignal();
+			case EContinue: throw new ContinueSignal();
 
-			case EThrow(inner): throw new MichThrow(eval(inner));
+			case EThrow(inner): throw new ThrowSignal(eval(inner));
 
 			case ETry(body, catches, always):
 				var result:Dynamic = null;
 				try {
 					result = eval(body);
-				} catch (sig:MichThrow) {
+				} catch (sig:ThrowSignal) {
 					var handled = false;
 					for (c in catches) {
 						if (c.type == null || typeOf(sig.v) == c.type) {
@@ -573,15 +574,15 @@ class Interp {
 					var threw = false;
 					try {
 						eval(inner);
-					} catch (_:MichThrow) {
+					} catch (_:ThrowSignal) {
 						threw = true;
 					}
 					if (!threw)
-						throw new MichThrow("Expected an exception but none was thrown");
+						throw new ThrowSignal("Expected an exception but none was thrown");
 				} else {
 					var v = eval(inner);
 					if (!isTruthy(v))
-						throw new MichThrow('Assertion failed: expected truthy, got ${valToString(v)}');
+						throw new ThrowSignal('Assertion failed: expected truthy, got ${valToString(v)}');
 				}
 				null;
 		}
@@ -946,7 +947,7 @@ class Interp {
 			};
 			for (s in stmts)
 				result = eval(s);
-		} catch (sig:ReturnSig) {
+		} catch (sig:ReturnSignal) {
 			result = sig.v;
 		}
 		env = saved;
@@ -1012,7 +1013,7 @@ class Interp {
 		env = callEnv;
 		try {
 			eval(f.body);
-		} catch (sig:ReturnSig) {}
+		} catch (sig:ReturnSignal) {}
 		env = saved;
 		yieldCollector = prevCollector;
 		return results;
@@ -1087,7 +1088,7 @@ class Interp {
 	inline function runLoop(body:Void->Void):Void {
 		try {
 			body();
-		} catch (_:StopSig) {}
+		} catch (_:StopSignal) {}
 	}
 
 	/** Runs a single loop iteration in a child scope, absorbing  continue. */
@@ -1097,14 +1098,14 @@ class Interp {
 		env = child;
 		try {
 			eval(body);
-		} catch (_:ContinueSig) {}
+		} catch (_:ContinueSignal) {}
 		env = saved;
 	}
 
 	// Type coercion / inspection
 	function castValue(v:Dynamic, type:String):Dynamic {
 		return switch type {
-			case "int": Std.int(v);
+			case "int": Std.isOfType(v, String) ? Std.parseInt(v) : Std.int(v);
 			case "float": (v : Float);
 			case "text": valToString(v);
 			case "bool": isTruthy(v);
@@ -1266,25 +1267,25 @@ class Interp {
 
 		m.set("equal", MichFunction.ofNative("equal", a -> {
 			if (!valEq(a[0], a[1]))
-				throw new MichThrow('Expected ${valToString(a[0])} == ${valToString(a[1])}');
+				throw new ThrowSignal('Expected ${valToString(a[0])} == ${valToString(a[1])}');
 			null;
 		}));
 
 		m.set("notEqual", MichFunction.ofNative("notEqual", a -> {
 			if (valEq(a[0], a[1]))
-				throw new MichThrow('Expected ${valToString(a[0])} != ${valToString(a[1])}');
+				throw new ThrowSignal('Expected ${valToString(a[0])} != ${valToString(a[1])}');
 			null;
 		}));
 
 		m.set("true", MichFunction.ofNative("true", a -> {
 			if (!isTruthy(a[0]))
-				throw new MichThrow('Expected truthy, got ${valToString(a[0])}');
+				throw new ThrowSignal('Expected truthy, got ${valToString(a[0])}');
 			null;
 		}));
 
 		m.set("false", MichFunction.ofNative("false", a -> {
 			if (isTruthy(a[0]))
-				throw new MichThrow('Expected falsy, got ${valToString(a[0])}');
+				throw new ThrowSignal('Expected falsy, got ${valToString(a[0])}');
 			null;
 		}));
 
@@ -1293,11 +1294,11 @@ class Interp {
 
 			try
 				callValue(a[0], [], new StringMap(), 0)
-			catch (_:MichThrow)
+			catch (_:ThrowSignal)
 				threw = true;
 
 			if (!threw)
-				throw new MichThrow("Expected an exception");
+				throw new ThrowSignal("Expected an exception");
 
 			null;
 		}));
@@ -1310,16 +1311,37 @@ class Interp {
 		return switch path {
 			case "math": SimpleMacro.gen(MichMath);
 			case "text": SimpleMacro.gen(MichText);
-			case "list": SimpleMacro.gen(MichList);
 			case "random": SimpleMacro.gen(MichRandom);
 			case "json": SimpleMacro.gen(MichJson);
 			case "time": SimpleMacro.gen(MichTime);
 			case "os": SimpleMacro.gen(MichOS);
 			case "io": SimpleMacro.gen(MichIO);
 			case "file": SimpleMacro.gen(MichFile);
+			case "list": listModule(); // Example of a module defined in pure Mich, not backed by any native code
 			case "assert": assertModule(); // not a real module, just a convenient place for test assertions
 			default: interpError('Unknown module "$path"', 0);
 		}
+	}
+
+	function listModule():Dynamic {
+		var m = new StringMap<Dynamic>();
+		m.set("sort", MichFunction.ofNative("sort", a -> {
+			var r:Array<Dynamic> = (cast a[0] : Array<Dynamic>).copy();
+			r.sort((p, q) -> valToString(p) < valToString(q) ? -1 : 1);
+			r;
+		}));
+		m.set("filter", MichFunction.ofNative("filter", a -> (a[0] : Array<Dynamic>).filter(x -> isTruthy(callValue(a[1], [x], new StringMap(), 0)))));
+		m.set("map", MichFunction.ofNative("map", a -> ((a[0] : Array<Dynamic>).map(x -> callValue(a[1], [x], new StringMap(), 0)) : Array<Dynamic>)));
+		m.set("reduce", MichFunction.ofNative("reduce", a -> {
+			var arr:Array<Dynamic> = a[0];
+			if (arr.length == 0)
+				return null;
+			var acc = arr[0];
+			for (i in 1...arr.length)
+				acc = callValue(a[1], [acc, arr[i]], new StringMap(), 0);
+			acc;
+		}));
+		return m;
 	}
 
 	// Global stdlib init
@@ -1351,7 +1373,7 @@ class Interp {
 		var err:Null<String> = null;
 		try {
 			eval(body);
-		} catch (sig:MichThrow) {
+		} catch (sig:ThrowSignal) {
 			err = valToString(sig.v);
 		} catch (e:Error) {
 			err = e.toString();

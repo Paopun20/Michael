@@ -1,0 +1,8 @@
+fun fib(n: int) -> int
+  if n <= 1
+    give n
+  end
+  give fib(n-1) + fib(n-2)
+end
+
+say fib(30)
